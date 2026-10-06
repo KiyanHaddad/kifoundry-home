@@ -1,0 +1,13 @@
+KiFoundry Home — product objective
+
+A welcoming persistent RPG home where a person can approach agents, talk naturally, show work, gather the Council and return later to continue. The project must be independently installable and usable with configured provider connections.
+
+First complete journey: enter the town, talk to Claude, bring a script, gather Codex and selected configured specialists, discuss the opening, save a revised script beside its original, close/reopen and continue.
+
+Council: everyone receives the same saved starting context and replies for themselves. One bounded peer-challenge stage follows, then an attributed synthesis that retains disagreements. A failed participant stays failed while useful replies survive. Council does not manufacture votes or force agreement.
+
+Casual talk needs no project form. The town remains present. Houses identify residents, the commons gathers the group, and the studio holds shared work. Movement reflects place; actual work states come from execution.
+
+Success requires the whole journey with real provider attribution, real saved versions, restart recovery, understandable failures, keyboard/compact-screen access and owner usability acceptance. A fixture, screenshot or passing unit test establishes only what it actually exercised.
+
+Public release, live-provider verification and user acceptance are separate gates. Preserve existing user data during upgrades and explicit migrations.

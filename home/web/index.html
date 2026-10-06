@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#172926">
+<title>KiFoundry Home</title><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#composerText">Skip to conversation</a>
+<header class="masthead">
+<a class="wordmark" href="/" aria-label="KiFoundry Home"><svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="m4 16 12-10 12 10M8 14v13h16V14M13 27v-8h6v8M16 2v4"/></svg><span>KiFoundry <strong>Home</strong></span></a>
+<div class="connection"><span class="local-label"><span class="local-dot" aria-hidden="true"></span>Local workspace</span><span id="modeLabel" class="mode-label">Connecting</span></div>
+</header>
+<main class="home-shell">
+<section class="world-panel" aria-labelledby="worldTitle">
+<div class="world-heading"><div><h1 id="worldTitle">A place to think together.</h1><p>Choose a home to talk. Meet at the commons to think together.</p></div><div class="world-actions"><span id="residentCount" class="resident-count"></span><button id="residentsButton" class="small-button" type="button">Residents</button></div></div>
+<nav id="districts" class="districts hidden" aria-label="Town neighborhoods"></nav>
+<div id="town" class="town" aria-label="Your town">
+<img class="town-art" src="/town-terrain.webp" width="1536" height="1024" alt="A lantern-lit forest clearing with paths between resident homes, a central Council table and a shared studio.">
+<div class="scene-hud"><span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10Z"/></svg>Evening at the commons</span></div>
+<div id="houses" class="houses" aria-label="Resident homes"></div><div id="residents" class="residents" aria-label="Residents in the village"></div>
+<button id="commonsButton" class="landmark commons" type="button"><span class="landmark-label"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 13h16M7 13v7m10-7v7M8 7a4 4 0 0 1 8 0M4 7v3m16-3v3"/></svg><span>The commons<small>Gather Council</small></span></span></button>
+<button id="studioButton" class="landmark studio" type="button"><span class="landmark-label"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 17 1-4L16 2l5 5L10 18l-6 1Zm9-12 5 5M4 22h16"/></svg><span>The studio<small>Bring your work</small></span></span></button>
+<div class="world-footer"><span id="worldStatus">Choose a home to start talking.</span><button id="motionButton" class="motion-button" type="button" aria-pressed="false">Pause wandering</button><span class="motion-legend">Walking is decorative</span></div>
+</div>
+<div class="continuity"><div class="continuity-heading"><h2>Your conversations</h2><button id="newRoomButton" class="text-button" type="button"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New conversation</button></div><nav id="rooms" class="room-list" aria-label="Saved conversations"></nav></div>
+</section>
+<section class="conversation-panel" aria-labelledby="roomTitle">
+<div class="conversation-header"><div><h2 id="roomTitle">Opening your home</h2><p id="conversationKind">Conversation</p></div><span id="savedLabel" class="saved-label"></span></div>
+<div id="bootError" class="notice error hidden" role="alert"><p id="bootErrorText"></p><button id="retryButton" class="small-button" type="button">Reconnect</button></div>
+<div class="participants-heading"><h3>Who receives your message</h3><button id="everyoneButton" class="text-button" type="button">Choose guests</button></div>
+<div id="participants" class="participants" aria-label="Choose who receives your message"></div>
+<p id="recipientHint" class="recipient-hint">Choose a resident or gather Council.</p>
+<div id="discussion" class="discussion" role="log" aria-label="Saved discussion" aria-live="polite" aria-relevant="additions"></div>
+<div id="roundActivity" class="round-activity hidden" aria-label="Council progress"></div>
+<section id="recoveryPanel" class="round-recovery hidden" aria-labelledby="recoveryTitle">
+<h3 id="recoveryTitle">Continue saved work</h3>
+<label for="recoverySelect">Stopped or interrupted round<select id="recoverySelect"></select></label>
+<p id="recoveryHint" class="recovery-hint" role="status"></p>
+<button id="resumeButton" class="small-button" type="button" aria-describedby="recoveryHint">Resume saved round</button>
+</section>
+<form id="composer" class="composer">
+<label for="composerText" id="composerLabel">What’s on your mind?</label>
+<textarea id="composerText" rows="3" maxlength="16384" placeholder="Say hello, or bring an idea to the table…" required disabled></textarea>
+<div class="composer-tools"><button id="bringWorkButton" class="text-button" type="button"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 7 7 14a3 3 0 0 0 4 4l8-8a5 5 0 0 0-7-7L3 12"/></svg>Bring work</button><span id="attachedWork" class="attachment-label"></span><button id="cancelButton" class="small-button hidden" type="button">Stop</button><button id="sendButton" class="primary-button" type="submit" disabled>Send</button></div>
+<p id="callCount" class="call-count">Choose a resident to begin.</p><p id="composerError" class="inline-error hidden" role="alert"></p>
+</form>
+<p class="conversation-footnote" id="conversationFootnote">Each resident speaks for themselves.</p>
+</section>
+<aside id="residentDirectoryPanel" class="directory-panel hidden" aria-label="Resident directory"></aside>
+<section id="studioPanel" class="work-panel hidden" aria-labelledby="studioTitle">
+<div class="section-heading"><div><h2 id="studioTitle">On the studio desk</h2><p>Bring a draft. Keep every revision.</p></div><button id="closeStudioButton" class="text-button" type="button">Close desk</button></div>
+<div class="artifact-controls"><label for="artifactSelect">Saved version<select id="artifactSelect"><option value="">New draft</option></select></label><button id="newDraftButton" class="small-button" type="button">New draft</button><button id="recoverDraftButton" class="small-button hidden" type="button">Recover unsaved edits</button></div>
+<form id="artifactForm"><label for="artifactTitle">Title<input id="artifactTitle" maxlength="200" placeholder="Give this work a name" required></label><label for="artifactContent">Draft<textarea id="artifactContent" rows="10" maxlength="65536" placeholder="Paste your script or work here." required></textarea></label><div class="artifact-actions"><label class="checkbox-label"><input id="attachArtifact" type="checkbox">Bring this saved draft to the next message</label><button id="saveArtifactButton" class="primary-button" type="submit">Save draft</button></div><p id="artifactError" class="inline-error hidden" role="alert"></p><p id="artifactNotice" class="artifact-notice" role="status"></p></form>
+<div id="comparison" class="comparison hidden"><div class="comparison-title"><h3>See what changed</h3><label for="compareSelect">Compare with<select id="compareSelect"></select></label></div><div class="comparison-columns"><section><h4 id="originalLabel">Earlier version</h4><pre id="originalContent"></pre></section><section><h4 id="revisionLabel">Selected version</h4><pre id="revisionContent"></pre></section></div></div>
+</section>
+</main>
+<dialog id="newRoomDialog"><form id="newRoomForm"><h2>Start a conversation</h2><label for="newRoomTitle">Conversation name<input id="newRoomTitle" maxlength="200" placeholder="What shall we call it?" required></label><p id="newRoomError" class="inline-error hidden" role="alert"></p><div class="dialog-actions"><button id="dismissRoomButton" class="small-button" type="button">Cancel</button><button id="createRoomButton" class="primary-button" type="submit">Start</button></div></form></dialog>
+</body></html>

@@ -1,0 +1,22 @@
+# Copy to local-config.toml and adjust your workspace and installed CLI paths.
+# Credentials remain in native provider sign-in. No API secrets belong here.
+[[agents]]
+id = "claude"
+name = "Claude"
+provider = "claude"
+role = "Explore concrete ideas and improve the work. Speak only for yourself."
+executable = "claude"
+workspace = "."
+timeout = 180
+
+[[agents]]
+id = "codex"
+name = "Codex"
+provider = "codex"
+role = "Challenge assumptions and verify engineering claims. Speak only for yourself."
+executable = "codex"
+workspace = "."
+timeout = 180
+
+# Add a same-provider specialist as another [[agents]] entry with a unique id,
+# a clear role and its actual provider. It has its own app-owned session.

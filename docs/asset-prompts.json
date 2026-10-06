@@ -1,0 +1,111 @@
+{
+  "tool": "Codex built-in image generation",
+  "generated_on": "2026-10-06",
+  "assets": [
+    {
+      "path": "home/web/town-dusk.webp",
+      "prompt": "Use case: stylized-concept. Asset type: original background illustration for a functional browser RPG AI home, landscape 1536x1024. Create a breathtaking, richly detailed cozy isometric forest village at blue-hour dusk, miniature handmade architectural diorama, elevated 45-degree perspective with coherent paths, painterly 3D with precise beautiful small details, restrained warm amber window lights against deep desaturated pine green and blue slate. The settlement occupies most of the frame, framed by forest edges rather than empty sky. Composition: five distinct small resident houses around the upper and side perimeter (one terracotta-roofed timber cottage at upper-left around x25% y35%, a teal-roofed stone library house at upper-right around x70% y32%, smaller third cottage at far-left mid-height x14% y56%, fourth small house at far-right x86% y53%, fifth house near upper-center x48% y22%). Central round outdoor Council table with five empty chairs, lanterns and circular cobbled courtyard at x48% y60%. A larger creative workshop studio at lower-right x73% y77% with warm tall windows and an open desk visible. Lower-left shallow stream with tiny arched wooden footbridge. Winding pale stone paths clearly connect houses to central courtyard and studio. Ferns, garden beds, blooming white flowers, books, a bicycle, crates, detailed layered conifers, chimney smoke, moss, shingles, glowing lantern posts, believable ground shadows and tactile craftsmanship. Make important houses and courtyard read clearly at small display sizes and leave clear ground around central table for interactive animated resident sprites. The world should feel inhabited, intimate, special and worth spending time in. No people or characters (added separately in app), no UI, no typography, no text, no labels, no logos, no watermark. No toy clipart, no basic geometric buildings, no photorealism, no sci-fi city. Edge-to-edge scene, no frame, not a floating island. Polished original game environment with exceptional art direction."
+    },
+    {
+      "path": "home/web/residents.webp",
+      "prompt": "Use case: stylized-concept. Asset type: original transparent character sprite atlas for a cozy isometric forest village browser game. Exactly FIVE distinct full-body small adult fantasy residents, each in their own equal-width column, one single straight horizontal row, generous transparent spacing, consistent character scale. Landscape 1536x512 canvas if possible. All characters fully visible from boots to head, with genuinely transparent background, no ground plane, no backdrop, no tile borders, no shadows extending into adjacent columns, no lettering. Each character centered at horizontal 10%, 30%, 50%, 70%, 90%, feet aligned around 90% canvas height, maximum width of each figure 12% of canvas. Art: beautifully detailed cute 3D painterly miniature diorama game figures, matches a warm lantern-lit isometric medieval pine village, view from slightly elevated front three-quarter angle, believable fabric folds and small props, rich restrained colors. Character 1: friendly thoughtful explorer in rust terracotta cape, short dark hair, carrying a small closed book. Character 2: inventive scholarly resident in deep teal long jacket, wavy silver hair, holding a rolled blueprint. Character 3: gardener maker in warm mustard vest, dark trousers, canvas satchel. Character 4: imaginative writer in muted plum cloak with a small notebook. Character 5: engineer in sage green work apron and cream sleeves. Warm soft directional light from upper left, finely crafted, charming expressive faces, sophisticated quality, not flat clipart or basic blobs. No known fictional characters, no brand logos. Each person is a separate isolated sprite in the same row."
+    },
+    {
+      "path": "home/web/town-terrain.webp",
+      "tool": "Codex built-in image generation",
+      "source_asset": "home/web/town-dusk.webp",
+      "operation": "Image-generation edit removing five residential cottages and replacing their footprints with empty clearings.",
+      "prompt": "Use case: precise-object-edit. Asset type: modular RPG terrain/background, same landscape 1536x1024. Edit the provided original lantern-lit forest village illustration. Keep its exceptional painterly 3D diorama/isometric view, detailed forest, stream, arched footbridge, central circular cobbled courtyard with the empty round Council table and lanterns, and the large creative studio at lower-right exactly in place. Remove ALL FIVE residential cottages: the terracotta upper-left house, upper-center slate house, teal upper-right library house, small mid-left cottage, small mid-right cottage. Replace each removed residential cottage and its foundation footprint with an open, level grassy/cobbled clearing, subtle empty garden borders and connecting paths. These clearings must be visibly empty but belong naturally to the terrain, wide enough for reusable house sprites placed later by the application. Keep the central Council table at around48%x43%y and lower-right studio around76%x72%y. The town ground becomes reusable scenery with no residential buildings painted in. Keep the cozy warm lantern-lit evening mood, rich detailed forest/moss/flowers/pebbles, coherent path network, matched perspective and lighting; do not flatten into simple shapes. No characters, no text/labels/UI/logos/watermarks. No other buildings or cottages elsewhere in background; only central table and lower-right studio are retained fixed structures. Do not change the camera or crop. This is a functional modular town substrate, not a redesign of the style.",
+      "prompt_record": "Exact generation prompt provided by the generation operator.",
+      "dimensions": {
+        "width": 1536,
+        "height": 1024
+      },
+      "bytes": 611324,
+      "conversion": "WebP quality 90; no crop or resize.",
+      "sha256": "b3801a4e82066b909ff83fdd744303b288dca96836482b37f8a0783105251afe"
+    },
+    {
+      "path": "home/web/houses.webp",
+      "tool": "Codex built-in image generation",
+      "style_reference_asset": "home/web/town-dusk.webp",
+      "operation": "Original cottage atlas generation followed by two image-generation spacing corrections.",
+      "prompt": "Correct ONLY the sprite spacing in this five-cottage transparent atlas. Preserve exactly the same five complete cottage designs and painterly village style.\nMake every house approximately 25% SMALLER than the supplied atlas. Place them at exact equal spacing in FIVE invisible equal-width columns. Each house, including all smoke, steps and planters, must fit within the central 70% of its column. There must be at least 15% FULLY TRANSPARENT space on BOTH sides of EVERY column; these are large empty gutters. No pixel of ANY house, smoke or decoration may cross a column boundary. All houses must have an identical bottom baseline at 85% of canvas height. Keep a wide 3:1 landscape canvas, one straight horizontal row only, centers at 10%, 30%, 50%, 70%, 90% canvas width.\nThe surrounding canvas must be genuinely transparent with clean alpha and completely empty gutters, no faint residual pixels, no red fringes, no scenery, no extra houses, no names, no people, no ground, no grid lines. The five warm glowing terracotta, teal, slate, plum, sage cottages must remain completely intact. This is a reusable production sprite sheet, so equal spacing and substantial transparent padding take priority.",
+      "prompt_scope": "Final spacing correction; initial generation and first correction are included below.",
+      "generation_steps": [
+        {
+          "stage": "initial generation",
+          "prompt": "Use case: stylized-concept\nAsset type: original modular RPG cottage sprite atlas for an interactive web town.\nInput images: Image 1 is a STYLE REFERENCE ONLY. Create a brand-new atlas, not a modified village scene. Match its exquisite detailed painterly 3D architectural diorama finish, isometric camera, dusk palette and golden window glow.\nScene/backdrop: genuinely transparent background (alpha channel), no scenery or floor terrain.\nPrimary request: exactly FIVE complete, distinct small cottage sprites, in a single straight horizontal row inside FIVE equal-width invisible cells. Landscape sheet aspect ratio 3:1. Every cottage is an isolated complete cutout, consistent architectural scale and camera angle, generous transparent padding all around; no overlap between cells. Cottage centers precisely at 10%, 30%, 50%, 70%, 90% of canvas width; their feet and front doorway bases share a baseline at 85% canvas height. Roofs and chimneys are fully contained within each cell.\nSubjects, left to right: (1) terracotta tiled timber cottage with peaked roof, oak door, small lantern, one vine and stacked firewood; (2) teal tiled library cottage with tall arched glowing window and visible tiny books behind glass; (3) slate roof stone cottage with broad low roof, round attic window and moss between stones; (4) plum roof workshop cottage with asymmetrical roofline, compact wooden annex and detailed craft bench visible inside its warm window; (5) moss/sage roof gardener cottage with curved roof silhouette, two small attached planters and leafy trellis.\nStyle/medium: polished original miniature architectural dioramas, beautiful fine painterly 3D detail. Shared 45-degree isometric orientation, front and right faces visible, calm dusk light from upper left. Warm amber illuminated windows, precise shingles, handmade timber, textured stone, distinct readable silhouettes. All five should feel like family variants from the same cozy village.\nConstraints: FIVE houses only; one horizontal row, not multiple rows; transparent background; no floor slabs, grass patches, paths, terrain, river, trees, detached props, people, characters, UI, captions, lettering, labels, logos, watermarks, grid lines or checkerboard texture. Tiny attached doorstep is acceptable as part of a cottage. Keep all cutout edges clean and complete. Do not crop roofs or chimneys. Avoid long smoke plumes and wide cast shadows that cross a cell boundary. No house-specific baked text. Deliver only the sprite sheet image.",
+          "selected": false
+        },
+        {
+          "stage": "first spacing correction",
+          "prompt": "Use case: precise-object-edit\nAsset type: transparent modular RPG cottage atlas.\nInput image 1 is the existing five-house atlas to correct. Keep the SAME FIVE cottage designs, colors, warm windows, beautiful painterly 3D architectural detail, isometric angle and lighting. Change only layout spacing and remove transparency speckles/edge artifacts. Do not repaint the designs or add houses.\nCritical correction: make exactly FIVE equal-width invisible cells across the landscape 3:1 image, in one horizontal row. Put one cottage fully INSIDE each cell with EMPTY TRANSPARENT LEFT AND RIGHT GUTTERS of at least 12% of its cell width on each side. Shrink every entire cottage to fit if necessary. No part of a house, roof, chimney, smoke, planter, step or shadow may extend over a cell boundary. The five cottages must be cleanly separated with wide visible transparent gaps. Their centers are exactly 10%, 30%, 50%, 70%, 90% of total canvas width. Align the lowest solid doorstep/foot at 85% image height. Leave at least 10% empty transparent margin above the highest chimney and 12% below the lowest part. Keep the same scale for all five houses. No cutoffs at any image edge.\nTrue alpha background throughout all gaps and margins; no black rectangle, no checkerboard pixels, no red halo, no transparency speckles. Clean antialiased cutout edges. No text, labels, people, detached props, scenery, floor terrain, paths, UI, grid or watermark. Deliver the corrected single sheet of exactly five isolated complete cottages.",
+          "selected": false
+        },
+        {
+          "stage": "final spacing correction",
+          "prompt": "Correct ONLY the sprite spacing in this five-cottage transparent atlas. Preserve exactly the same five complete cottage designs and painterly village style.\nMake every house approximately 25% SMALLER than the supplied atlas. Place them at exact equal spacing in FIVE invisible equal-width columns. Each house, including all smoke, steps and planters, must fit within the central 70% of its column. There must be at least 15% FULLY TRANSPARENT space on BOTH sides of EVERY column; these are large empty gutters. No pixel of ANY house, smoke or decoration may cross a column boundary. All houses must have an identical bottom baseline at 85% of canvas height. Keep a wide 3:1 landscape canvas, one straight horizontal row only, centers at 10%, 30%, 50%, 70%, 90% canvas width.\nThe surrounding canvas must be genuinely transparent with clean alpha and completely empty gutters, no faint residual pixels, no red fringes, no scenery, no extra houses, no names, no people, no ground, no grid lines. The five warm glowing terracotta, teal, slate, plum, sage cottages must remain completely intact. This is a reusable production sprite sheet, so equal spacing and substantial transparent padding take priority.",
+          "selected": true
+        }
+      ],
+      "dimensions": {
+        "width": 2172,
+        "height": 724
+      },
+      "bytes": 746356,
+      "conversion": "Lossless WebP method 6; no visual modification; RGBA pixels identical after reload.",
+      "sha256": "eb777b71fef42c478e49276ce456151e1e07b504883088a956afa9975ab11742",
+      "alpha": {
+        "present": true,
+        "min": 0,
+        "max": 255,
+        "zero_fraction": 0.7837373960908804,
+        "boundary_column_maxima": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "solid_cell_local_bounds_at_alpha16": [
+        [
+          77,
+          222,
+          375,
+          562
+        ],
+        [
+          91,
+          221,
+          373,
+          576
+        ],
+        [
+          70,
+          220,
+          356,
+          577
+        ],
+        [
+          57,
+          223,
+          365,
+          575
+        ],
+        [
+          77,
+          221,
+          370,
+          578
+        ]
+      ],
+      "limitations": [
+        "Five equal-width cells are 434.4 pixels wide.",
+        "Solid cottage feet are between 77.6% and 79.8% of image height, rather than the requested exact 85% baseline.",
+        "Very low alpha residual pixels and fine cutout fringes remain within some cells; nominal cell boundary columns are alpha zero."
+      ]
+    }
+  ],
+  "notes": "Original generated project illustrations. Resident and house atlases contain five static variants each, not directional animation. No private history, source machine paths, session identifiers or provider identity included. Packaging records do not establish owner acceptance or functional provider execution."
+}

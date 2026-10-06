@@ -1,0 +1,36 @@
+Native adapter boundaries
+
+The server selects executable and workspace. Browser content is stdin text, never
+command arguments or executable configuration. Native CLI authentication stays with
+its owner; these adapters neither acquire keys nor change account/model settings.
+New replies report their actual CLI session. Exact resumes accept UUIDs only and do
+not silently fork or substitute private sessions. Identity keys serialize UUID case
+aliases, but only cooperating app calls share that lock. External terminal activity
+is outside its control. Different adapter instances get distinct fresh identity keys.
+
+Claude uses --print stream-json, no built-in tools, no slash commands and an empty
+strict MCP configuration. It does not set a model or permission mode. Native user/
+project settings and hooks remain inherited; a hook can execute before a visible
+model response. No claim of universal side-effect isolation is made.
+
+Codex uses JSONL, read-only sandbox and never approval policy for both fresh and
+exact-resume calls. It preserves native model configuration. Inherited hooks, MCP,
+network tools and provider behavior are not universally disabled by those settings.
+An unexpected item/action event stops the owned process and fails the conversation
+call, but event detection cannot undo an action already started or catch an action
+the CLI does not report. This adapter is not an OS security boundary. Configure only
+trusted workspaces and reviewed native customizations before enabling live operation.
+
+Only the launched process tree is stopped: an owned Job Object on Windows, a new
+process group on POSIX. Windows rejects execution when Job ownership cannot be
+established. The process begins before Job attachment; it is not a suspended-start
+sandbox. Unrelated stored PIDs are never killed. Output and input have byte limits,
+calls have finite deadlines, and raw stderr, paths and provider errors are excluded
+from UI exceptions. Tool event errors may occur after a native session was created;
+failed calls do not claim to have captured a safe resumable final result.
+
+CLI help inspected during implementation was the flag authority. CLI updates can
+change schemas/flags; unsupported or malformed replies fail visibly. Reported model
+is retained when supplied, otherwise unknown. Fixture tests verify process/protocol
+handling only; actual provider attribution, sign-in and live continuation need a
+separate authorized smoke run outside the public repository.

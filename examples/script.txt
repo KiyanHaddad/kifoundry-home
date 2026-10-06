@@ -1,0 +1,7 @@
+Why a confident AI answer isn't a completed action
+
+Opening: AI can help us schedule things. But sometimes it only says what it would do.
+Middle: A chat reply describes a calendar event. A tool call creates one. Check the saved event and its date before saying the task is done.
+Ending: Ask for the result, then verify it where the action should have happened.
+
+Original public demonstration text written for this repository. No private account or client data.

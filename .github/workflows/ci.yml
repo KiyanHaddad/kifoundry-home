@@ -1,0 +1,27 @@
+name: Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q home scripts
+      - run: python -m ruff check home tests scripts
+      - run: python -m mypy home
+      - run: node --check home/web/app.js
+      - run: node --check home/web/world.js
+      - run: node --check home/web/world-layout.js
+      - run: node --check home/web/resident-directory.js
+      - run: node --check home/web/room.js
+      - run: python scripts/check_public_tree.py
