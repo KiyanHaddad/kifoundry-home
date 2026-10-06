@@ -28,7 +28,7 @@ The browser adds residents through an existing trusted provider binding. Native 
 
 Schema 2 stores resident IDs, home slots and archive state. Moving out preserves conversations and sessions while releasing the home; bringing back prefers the old slot and uses another free slot if occupied. New rounds freeze participant names, providers and roles, and saved replies retain speaker attribution. Existing active residents keep their locations when others change.
 
-Fixture residents are scripted and explicitly labelled. Desktop and phone fixture views were reviewed. A two-person native Claude/Codex Council, saved revision comparison and continued conversation after a separate server restart passed; see docs/VERIFICATION.md. Owner usability acceptance and actual 64-provider scale remain open. Decorative walking does not establish provider execution or autonomous learning.
+Fixture residents are scripted and explicitly labelled. Desktop and phone fixture views were reviewed. Native Claude/Codex conversations, a three-resident Council, saved revision comparison and continued conversation after a separate server restart passed; see docs/VERIFICATION.md. User usability acceptance and actual 64-provider scale remain open. Decorative walking does not establish provider execution or autonomous learning.
 
 ## Brand Commitments
 

@@ -40,10 +40,16 @@ A keyboard journey covered conversation creation, Send, the studio, two saved ve
 - 115 tests passed from source and from a clean installed wheel outside the checkout.
 - Ruff, mypy for the Windows host and Linux target, compilation, and all five browser-module syntax checks passed.
 - Source and wheel builds, isolated installation, CLI help, imports, all 14 web assets and the included MIT/OFL licenses passed verification.
-- The candidate public-tree scanner passed. Release review of the exact outgoing tree remains required.
+- The exact 63-file initial public tree passed credential/private-information review, binary metadata checks and verification of the actual staged and committed Git blobs. New changes require a fresh outgoing-tree review.
+
+## GitHub checks
+
+The initial public commit passed all four GitHub Checks jobs on 6 October 2026: Ubuntu and Windows, each with Python 3.11 and 3.13. Each job ran 115 tests successfully, compilation, Ruff, mypy, all five browser-module syntax checks and the public-tree scanner. The repository's Actions tab records the actual runs. These hosted checks exercise fixtures and controlled processes; genuine native-provider verification remains Windows-specific.
+
+Remote readback matched all 63 published files to the reviewed commit. The initial history contains only reviewed source, and the commit uses a GitHub noreply address. GitHub secret scanning and push protection were enabled, with no open secret-scanning alerts observed at publication. Local configuration, authentication, histories and private receipts were excluded.
 
 ## Still unverified
 
-Actual 64-provider scale, synthesis quality with short excerpts, abrupt server crashes or OS reboot, Linux/macOS runtime integration, Python 3.13 execution, remote GitHub CI, and owner usability acceptance. Native process exit does not prove remote provider cancellation or charge reversal. Usage costs were not measured.
+Actual 64-provider scale, synthesis quality with short excerpts, abrupt server crashes or OS reboot, genuine native-provider integration on Linux/macOS, and user usability acceptance. Native process exit does not prove remote provider cancellation or charge reversal. Usage costs were not measured.
 
 Private receipts, native session IDs, account information and raw transcripts are kept outside this source tree.

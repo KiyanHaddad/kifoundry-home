@@ -26,5 +26,7 @@
 - Verified Claude, Codex and a Claude-backed specialist together in a seven-call Council; saved its actual revised script as version 3 beside the preserved earlier versions.
 - Verified live Stop and safe Resume for both native providers, owned process exit, separate-process reopening and exact-session continuation without duplicate calls.
 - Passed the expanded 115-test suite from source and a clean installed wheel, including recovery eligibility and uncertain-call handling.
+- Published the initial public source after a 63-file privacy review and staged/committed Git-blob checks; verified matching remote contents and GitHub noreply commit metadata.
+- Passed all four GitHub jobs on Ubuntu/Windows with Python 3.11/3.13, each running 115 tests and the configured developer checks.
 
-Native 64-person scale, abrupt-crash recovery and owner acceptance remain open. No formal Impeccable composition approval, detector pass or published release is claimed by this entry. Verification is recorded separately.
+Native 64-person scale, abrupt-crash recovery and user acceptance remain open. This is a development alpha. Verification is recorded separately.
