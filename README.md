@@ -1,48 +1,45 @@
 # KiFoundry Home
 
-A shared local AI home: talk with residents, gather a Council, keep useful work, and return to the same discussion.
+An RPG town for conversations with AI agents. Visit a resident, bring a draft, ask a group to challenge it, and keep the discussion and revisions for later.
 
-**Development alpha.** Fixture checks, real provider verification, owner acceptance and GitHub publication are separate milestones. See [known limitations](docs/KNOWN-LIMITATIONS.md) before making release claims.
+**Local development alpha · Python 3.11+ · Windows native-provider verification**
 
-## Quickstart
+![The town running in offline demo mode](docs/images/town-demo.jpg)
 
-Python 3.11 or newer is the only application runtime dependency. From this repository:
+## Try it
 
-```sh
-python -m home.cli --demo --open
-```
-
-Demo residents are explicitly labelled fixtures. They exercise the interface and saved lifecycle; they do not contact AI providers.
-
-For native providers, sign in through your installed Claude Code and Codex CLIs, copy `examples/agents.toml` to ignored `local-config.toml`, set the workspaces and executable paths, then run:
+Download **Code → Download ZIP**, extract it, and open a terminal in the extracted folder containing this README. Or clone the repository with Git.
 
 ```sh
-python -m home.cli --config local-config.toml --open
+python -m home.cli --demo --data-dir .demo-data --open
 ```
 
-Native replies consume your provider usage. The app shows a one-call conversation or a Council bound of `2N+1` calls before starting. Same-provider specialists are identified by their actual provider. These are app-owned native sessions, separate from a desktop chat or another private session.
+This opens a browser with clearly labelled, scripted residents. It needs no account and makes no AI calls. Keep the terminal open; press **Ctrl+C** to stop. The ZIP contains source code, not a desktop installer.
 
-Use **Residents** to add someone through a configured connection, invite guests, move someone out or bring them back. Saved homes and conversations stay attached to their resident IDs. The town supports 64 active residents in neighborhoods of five homes, and Council can include the whole available town.
+For Python installation, a virtual environment, or troubleshooting, follow the [getting started guide](docs/QUICKSTART.md).
 
-## The experience we are building
+## What you can do
 
-Enter the town, approach a resident, bring a script, gather the Council, discuss and revise it, compare the versions, then reopen and continue. Saying hello requires no project form. The world remains present while the discussion happens.
+| You want to… | Start here |
+| --- | --- |
+| Talk to one resident | Choose their house or **Residents → Talk** |
+| Discuss an idea together | Choose guests, then **Ask the Council** |
+| Improve a script or draft | **Bring work**, save it, then send your request |
+| Keep a useful reply | **Use as draft**, review it, then save a revision |
+| Continue later | Restart with the same data directory and open the saved conversation |
 
-Council participants make independent proposals from the same saved context, challenge the actual replies, and produce an attributed synthesis. Disagreement stays visible. A failed participant does not erase another participant's work.
+Council uses independent proposals, one round of challenges, and an attributed synthesis. It preserves replies and disagreements. A group of `N` residents can use up to `2N+1` provider calls; the interface shows the bound before Send.
 
-After Stop or an interrupted round, **Continue saved work** shows the saved participants and remaining call bound. **Resume saved round** reuses saved replies and starts only work that never launched. Calls with uncertain outcomes stay recorded and are not repeated; if no safe work remains, send a new message to continue.
+## Use real AI
 
-Use `examples/script.txt` for the public demonstration. Your real histories and drafts remain in your selected local data directory; they are not source files.
+Install and sign in to Claude Code and/or Codex separately, then configure a local connection. Follow [provider setup](docs/PROVIDERS.md). Native replies use your provider account. The app creates its own sessions; it does not attach to an existing desktop chat.
 
-## Project map
+Conversations and saved drafts live on your computer. Prompts and selected context go to the configured provider when you send a native message. See [privacy and data](docs/PRIVACY.md).
 
-- [Architecture](docs/ARCHITECTURE.md): responsibilities and decisions.
-- [Contracts](docs/CONTRACTS.txt): storage, adapters, Council and HTTP integration.
-- [Provider setup](docs/PROVIDERS.md): native sign-in and execution boundaries.
-- [Extensions](docs/EXTENDING.md): add a resident, provider or policy.
-- [Contributing](CONTRIBUTING.md): meaningful checks and change workflow.
-- [Roadmap](docs/ROADMAP.md): full destination and unfinished gates.
-- [Verification](docs/VERIFICATION.md): executed checks and their limits.
-- [Asset provenance](ASSETS.md) and [license](LICENSE).
+## Learn more
 
-The application code, assets, examples and contributor documentation live in this repository. Assets have documented provenance. Keep local provider configuration, authentication and conversation data outside the published source.
+- [User guide](docs/USING.md) — conversations, Council, revisions and recovery.
+- [Documentation index](docs/README.md) — setup, troubleshooting and developer reference.
+- [Known limitations](docs/KNOWN-LIMITATIONS.md) · [next improvements](docs/ROADMAP.md).
+- [Contributing](CONTRIBUTING.md) · [architecture](docs/ARCHITECTURE.md) · [contracts](docs/CONTRACTS.md).
+- [MIT license](LICENSE) · [asset provenance](ASSETS.md) · [verification](docs/VERIFICATION.md).

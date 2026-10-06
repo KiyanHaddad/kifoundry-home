@@ -25,3 +25,4 @@ jobs:
       - run: node --check home/web/resident-directory.js
       - run: node --check home/web/room.js
       - run: python scripts/check_public_tree.py
+      - run: python scripts/check_public_tree.py --tracked

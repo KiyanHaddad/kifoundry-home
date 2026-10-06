@@ -2,6 +2,14 @@
 
 This is a local development alpha. These checks establish specific behavior. User acceptance, repository publication and remote CI have separate evidence.
 
+## Documentation and privacy follow-up
+
+The published baseline was independently rescanned across all 63 files and 69 unique blobs in its two-commit history. The review covered known credential/private-path patterns, private transcript/session comparisons, asset metadata, exact remote-tree identity and GitHub security settings; no material privacy finding was detected. Public GitHub ownership and noreply attribution remain intentionally visible.
+
+The publication scanner now reads actual Git index or committed HEAD blobs and rejects sensitive tracked paths even when force-added. Seven repository-tooling regressions cover ignored sensitive files, staged/committed values hidden by clean working copies, links, private-data shapes, no-Git downloads and legitimate relative module links. The expanded source suite passed 122 tests locally. This is separate from the earlier 115-test installed-wheel evidence below; application runtime bytes are unchanged.
+
+The README screenshot is an actual fresh, offline two-resident fixture town. A browser greeting completed with an explicitly labelled fixture reply. Setup and user instructions were checked against the CLI, configuration and interface, and local documentation links were reviewed. These checks do not establish newcomer usability acceptance or native-session migration.
+
 ## Resident lifecycle and town
 
 - Controlled tests cover 64 active residents, stable home slots, archive/restore, missing bindings, migration, attribution and registry HTTP boundaries.

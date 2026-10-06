@@ -1,5 +1,11 @@
 # Asset provenance
 
+## Documentation screenshot
+
+`docs/images/town-demo.jpg` is an unedited browser capture of this application on 6 October 2026. It shows a fresh offline fixture town with the default Echo and Quill residents and no user conversations. It contains no browser chrome, local paths, launch URL or native provider data. The included artwork and fonts retain the provenance and licenses below.
+
+SHA-256: `ed36ca3b0191b949d96a2cb7285d498b44853efcfa360b51e1843664b67432d6`.
+
 Public demonstration text in `examples/script.txt` and the interface code are original to this project. Provider CLIs are external prerequisites and are not bundled.
 
 ## Illustrated town and residents

@@ -1,59 +1,8 @@
-Module contracts — resident registry revision (SQLite schema 2)
+The contributor contracts have moved to CONTRACTS.md in this folder.
 
-Python 3.11+, standard-library runtime, SQLite, browser ES modules. No microservices or frontend build dependency for the first working slice. Provider-native authentication stays in the installed CLIs. No API key is requested or copied by this project. These contracts are intentionally small; update them and consumers together when evidence requires a change.
+Read the formatted version on GitHub:
+https://github.com/KiyanHaddad/kifoundry-home/blob/main/docs/CONTRACTS.md
 
-Backend modules
-home/models.py: frozen dataclasses Agent(id, name, provider, role="") and Reply(text, provider, session_id=None, model=None); provider Protocol generate(prompt: str, session_id: str | None, cancel: threading.Event) -> Reply, provider string and identity_key(session_id: str | None) -> str. Each configured resident owns an adapter instance. Identity keys must serialize aliases of a bound actual provider session; app-owned fresh sessions must not collide with another fresh resident.
-home/store.py: Store(path: Path). Versioned SQLite schema; transactionally save messages and request IDs before dispatch. Public operations return JSON-serializable dictionaries.
-  create_room(title="Commons") -> room summary {id,title,created_at,updated_at}; load room(id) for messages, rounds and artifacts.
-  list_rooms() -> list of room dicts
-  room(room_id) -> {id,title,messages:[...],rounds:[...],artifacts:[...]}
-  save_artifact(room_id,title,content,artifact_id=None,expected_version=None) -> artifact version dict; optimistic conflict must not overwrite history.
-  residents() -> all registry rows, archived included.
-  seed_residents(rows) -> insert configured seeds once per ID; never overwrite registered rows or revive archived seeds on restart. A full town defers new seeds until a later restart with a free slot; configured bindings remain offered and existing homes still open.
-  add_resident(id,name,provider,role,binding_id) -> saved resident in the first free active home slot.
-  set_resident_archived(id,archived) -> saved row; archive preserves history/session data and releases the slot; restore prefers the previous slot, otherwise the first free slot. Other active residents do not move.
-  Methods needed internally for durable rounds/turns, saved sessions and recovery are the store author's responsibility; document them rather than expose SQL throughout other modules.
-home/residents.py: ResidentBinding(id,label,provider,factory,addable=True) holds trusted server-side adapter construction. factory(name) returns a separate adapter for each managed resident. Seed(agent,binding_id) registers an initial resident. Binding info exposed to the browser contains id,label,provider only. Static legacy adapters are not offered for adding residents.
-home/config.py: ignored native TOML supplies one to five bindings and seeds through existing [[agents]] entries. Each binding can create multiple residents; this setup limit is independent of the town's 64 active residents and Council participants.
-home/council.py: Council(store, agents=None, adapters=None, max_workers=4, bindings=None, seeds=None). The agents/adapters arguments remain supported for static integrations; managed registry integrations supply bindings and seeds.
-  start(room_id,text,participants: list[str],request_id,mode="council",artifact_ids=None) -> round dict (id,status,...).
-  cancel(round_id) -> round dict.
-  resume(round_id,retry_interrupted=False) -> round dict; uncertain launched calls are not repeated by default.
-  close() -> request stop, join owned work with bounds.
-  agents_info(include_archived=False) -> list {id,name,provider,role,binding_id,home_slot,archived,available} without private configuration. Active residents with missing bindings remain visible but cannot dispatch. available describes local binding/adapter availability; it does not verify native authentication or account quota.
-  bindings_info() -> list {id,label,provider} for addable trusted bindings.
-  add_resident(name,role,binding_id), archive_resident(id), restore_resident(id) -> resident info. Changes require all owned round drivers to finish, including calls still exiting after Stop.
-  recover interrupted persisted rounds on construction, without relaunching.
-home/adapters/: provider implementations; fixture explicitly labelled. Native Claude and Codex parsing/process tests do not establish actual provider journeys. No arbitrary browser-selected executable or session.
-home/server.py and home/cli.py: local HTTP transport and explicit server-side configuration; no domain logic here.
-home/web/: town, conversation, Council, directory and artifact views. world-layout.js maps saved slots to neighborhoods of five plots; avatar appearance is stable by ID. room.js flattens nested immutable artifact versions for the editor. All model/owner content is rendered as text. UI calls HTTP routes below only.
-  room.js recoveryInfo(round) derives safe-resume eligibility, uncertain launched-call count and a conservative remaining call bound. The recovery selector uses saved participant snapshots, preserves the current draft and posts {} only. The browser never offers retry_interrupted. A confirmed resume response is adopted before optional readback, preventing a failed readback from prompting duplicate dispatch. Temporarily disabled controls restore lost keyboard focus only when focus has fallen to the document body.
-
-Resident semantics
-At most 64 active residents; archived rows are retained separately. home_slot is 0..63 and unique among active residents. Add creates a stable server-generated ID, validates a non-empty name (up to 60 characters) and role (up to 4 KiB), and accepts only an existing addable binding_id. Fixture names remain explicitly marked. Browser requests cannot set provider, executable, workspace, session or model. Each native binding can create multiple resident adapters; account quotas still apply.
-Archive removes a resident from active selection and dispatch, keeping messages, rounds, draft history and per-room sessions. Restore requires the matching trusted provider binding and a free active slot. Registry mutations cannot alter an in-flight round. New rounds capture {name,provider,role} per participant and new agent messages store agent_name and agent_provider; later registry changes do not rewrite those historical identities. Schema-1 history receives empty/null snapshot fields during migration and uses existing fallback attribution.
-
-Council semantics
-One active round per room; repeated request ID with identical payload returns its saved round, while mismatched reuse rejects. Council accepts 2–64 participants. Reject unknown, archived, unavailable or duplicate participants, invalid input or artifact belonging to another room before any provider launch. Persist owner message, participant snapshots and a bounded frozen context, including selected exact artifact versions.
-Ordinary direct mode has one participant and one genuine response. Direct prompts carry bounded saved room history on every turn, including intervening Council replies, and resume the resident's direct session. Fresh Council phase sessions never replace it. Council mode has parallel proposal calls, parallel critique calls seeing all saved proposal outcomes, then one synthesis from the first successful selected participant. At most 2N+1 calls, four concurrent workers by default. No recursive automatic rounds. All proposal calls use the same starting context apart from participant role framing. Save actual replies with attributed provider, reported session/model and phase.
-Persist queued/running/completed/failed/cancelled/interrupted turn states. Return immediately after scheduling. Preserve independent successful replies on partial failure. Cancellation stops only owned work, preserves prior replies and prevents later stages. A restart marks uncertain work interrupted and never blindly relaunches it. Serialize actual session identity across aliases and rooms; documented cooperative ownership does not claim control over unrelated external terminal resumes.
-Do not hold an entire transcript in memory or silently exceed budgets: validate inputs (16 KiB owner message, 64 KiB artifact), bounded context (~48 KiB), 128 KiB assembled provider prompt, bounded reply and native stdout/stderr, finite per-call timeout. Retain every participant heading/status and all fixed context. Allocate remaining peer-reply bytes fairly with unused short-reply space redistributed; mark shortened text as an excerpt with its full reply saved in the room. Never alter stored replies. The synthesis must not infer agreement from excerpts. Refuse oversized fixed framing before saving or launching. Human-readable failure summaries must not expose raw stderr, credentials or private configuration.
-
-HTTP contract (loopback only, Host/Origin validation, private cookie and CSRF)
-Authentication cookies are named by the actual bound port, so separate local Home servers can share a browser without overwriting each other's session. Cookie values remain private, HttpOnly and SameSite; a sibling server's cookie or CSRF token cannot authenticate a request.
-GET /api/state -> {agents:[active resident info...],archived_agents:[...],resident_bindings:[...],capabilities:{max_residents,max_participants,max_provider_calls,max_workers,max_prompt_bytes},rooms:[...],room:<first saved room>,fixture:bool}; the browser can reopen its locally remembered room. Production limits are 64 residents/participants, 129 calls and 131072 prompt bytes; max_workers reports the configured worker count. The UI uses advertised execution limits, independently of its five visible seats.
-GET /api/rooms/<id> -> room
-POST /api/rooms {title} -> room summary; GET /api/rooms/<id> loads the complete room. A failed readback must retry opening the confirmed room rather than creating another.
-POST /api/rooms/<id>/rounds {text,participants,request_id,mode,artifact_ids?} -> round
-POST /api/rounds/<id>/cancel {} -> round
-POST /api/rounds/<id>/resume {} -> round; default safe resume only, no browser option for repeating uncertain calls.
-POST /api/agents {name,role,binding_id} -> resident info
-POST /api/agents/<id>/archive {} -> resident info
-POST /api/agents/<id>/restore {} -> resident info
-POST /api/rooms/<id>/artifacts {title,content,artifact_id?,expected_version?} -> artifact
-GET /api/session -> {csrf}; no model call or mutation. All other API requests require authenticated private local cookie. CSRF required on POST. No arbitrary filesystem route. JSON errors have {error: human-readable safe summary} and appropriate 4xx/5xx code.
-
-Room message fields consumed by UI: id,role(owner/agent/system),agent_id(optional),agent_name(optional),agent_provider(optional),phase(optional),content,created_at. Room rounds include id,status,mode,participants,participant_snapshots and turns. Turns include id,agent_id,phase,status,content,error(optional),provider/session_id/model(optional; private IDs only optional local details). Room artifacts contain one latest object per artifact, with a versions array containing all immutable versions. Each version includes id,title,version,content,sha256,created_at. The frontend room.js boundary flattens those versions for the editor. Stable field names are shared integration contracts.
-
-Do not embed private histories or provider bindings in example configuration, tests or assets. Deterministic fixture mode is explicit and never labelled real Council. Real-provider smoke evidence is stored outside the public tree.
+This compatibility file keeps existing links working. CONTRACTS.md is the
+maintained reference for module boundaries, the local HTTP API, resident
+lifecycle, Council limits and recovery behavior.

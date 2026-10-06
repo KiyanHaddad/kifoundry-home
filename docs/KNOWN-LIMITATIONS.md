@@ -2,6 +2,11 @@
 
 This development alpha is progressing toward the full shared-home journey. Hands-on user acceptance remains open.
 
+- Download is source code; no desktop installer or guided provider setup is shipped. Binding availability does not establish native sign-in or quota.
+- Demo and native modes share the default data folder. Use the separate explicit paths in [getting started](QUICKSTART.md).
+- Commons currently selects all available residents. Review the guest list and call bound before Send.
+- There is no conversation/draft export interface or complete cross-device native-session migration. Database backups preserve saved records; provider sessions require their own continuity.
+
 - Native Claude/Codex Council, a three-resident Council including a Claude-backed specialist, and exact direct-session continuation passed on Windows; see [verification](VERIFICATION.md). Actual 64-provider scale and synthesis quality with short excerpts remain unverified.
 - Private exact-session integration is not included. App-owned native sessions are separate.
 - Native action-event rejection is detection, not prevention of every inherited hook/integration.

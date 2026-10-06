@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Rewrote the README around downloading and using the application, with an actual clean-demo screenshot.
+- Added getting started, user, privacy/data and troubleshooting guides plus a documentation index. Separated demo and native data paths in the examples.
+- Replaced the dense contract text with a structured Markdown reference; the old path remains a compatibility pointer. Corrected room response and bounded-readback details against the code.
+- Hardened privacy checks to inspect actual Git index/HEAD blobs, reject sensitive tracked filenames and report findings without matched values. Added seven regression tests and a committed-tree check to CI.
+- Documented the next setup, Council and export improvements, and the compatibility work required for a future rename.
+
 ## 0.1.0 — development
 
 - Established the shared-home objective and bounded Council contracts.
