@@ -10,7 +10,7 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from .models import MAX_PROMPT_BYTES, HomeError
 
@@ -33,6 +33,7 @@ def same_secret(value: object, secret: str) -> bool:
 
 class HomeServer(ThreadingHTTPServer):
     daemon_threads = True
+    max_request_threads = 16
 
     def __init__(self, port: int, store: Any, council: Any, fixture: bool = False) -> None:
         super().__init__(("127.0.0.1", port), Handler)
@@ -43,11 +44,30 @@ class HomeServer(ThreadingHTTPServer):
         self.cookie_token = secrets.token_urlsafe(32)
         self.csrf = secrets.token_urlsafe(32)
         self.auth_lock = threading.Lock()
+        self._request_slots = threading.BoundedSemaphore(self.max_request_threads)
         actual_port = self.server_address[1]
         # Cookies ignore ports, so simultaneous local Home instances need distinct names.
         self.cookie_name = f"home_session_{actual_port}"
         self.hosts = {f"127.0.0.1:{actual_port}", f"localhost:{actual_port}"}
         self.origins = {f"http://{host}" for host in self.hosts}
+
+    def process_request(self, request: Any, client_address: Any) -> None:
+        # Admission happens before ThreadingMixIn creates a thread, including for
+        # unauthenticated clients that have not finished their request headers.
+        if not self._request_slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._request_slots.release()
+            raise
+
+    def process_request_thread(self, request: Any, client_address: Any) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._request_slots.release()
 
     @property
     def launch_url(self) -> str:
@@ -104,14 +124,20 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authenticated():
             self._json({"error": "Reopen Home using its launcher"}, 401)
             return False
+        # Cookies cross localhost ports. A sibling HTTP service can see the cookie,
+        # but must not exchange it for the origin-scoped browser proof or private data.
+        if not same_secret(self.headers.get("X-CSRF-Token", ""), self.server.csrf):
+            self._json({"error": "Refresh Home before sending this action"}, 403)
+            return False
         return True
 
     def do_GET(self) -> None:
         if not self._origin_ok():
             return
-        path = urlsplit(self.path).path
+        parsed = urlsplit(self.path)
+        path = parsed.path
         if path == "/api/session":
-            if self._authenticated():
+            if self._authenticated() and same_secret(self.headers.get("X-CSRF-Token", ""), self.server.csrf):
                 self._json({"csrf": self.server.csrf})
                 return
             token = self.headers.get("X-Home-Launch", "")
@@ -129,12 +155,22 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 if path == "/api/state":
-                    rooms = self.server.store.list_rooms()
-                    room = self.server.store.room(rooms[0]["id"]) if rooms else None
+                    page = self.server.store.list_rooms_page()
+                    rooms = page["rooms"]
+                    room = self.server.store.room_for_browser(rooms[0]["id"]) if rooms else None
                     self._json({"agents": self.server.council.agents_info(), "rooms": rooms, "room": room,
+                                "next_room_cursor": page["next_room_cursor"],
                                 "fixture": self.server.fixture, **self._registry_state()})
+                elif path == "/api/rooms":
+                    self._json(self.server.store.list_rooms_page(self._before_cursor(parsed.query)))
                 elif path.startswith("/api/rooms/") and len(path.split("/")) == 4:
-                    self._json(self.server.store.room(path.split("/")[3]))
+                    self._json(self.server.store.room_for_browser(path.split("/")[3]))
+                elif path.startswith("/api/rooms/") and len(path.split("/")) == 5 and path.split("/")[4] == "artifacts":
+                    self._json(self.server.store.artifact_page(path.split("/")[3], self._before_cursor(parsed.query)))
+                elif path.startswith("/api/rooms/") and len(path.split("/")) == 8 and path.split("/")[4] == "artifacts" and path.split("/")[6] == "versions":
+                    parts = path.split("/")
+                    version = self._positive_integer(parts[7], "artifact version")
+                    self._json(self.server.store.artifact_version(parts[3], parts[5], version))
                 else:
                     self._json({"error": "Unknown endpoint"}, 404)
             except HomeError as error:
@@ -201,15 +237,29 @@ class Handler(BaseHTTPRequestHandler):
                 "max_workers": 1, "max_prompt_bytes": MAX_PROMPT_BYTES}
 
     @staticmethod
+    def _before_cursor(query_string: str) -> int | None:
+        query = parse_qs(query_string, keep_blank_values=True)
+        if set(query) - {"before"} or len(query.get("before", [])) > 1:
+            raise HomeError("Invalid history query")
+        values = query.get("before")
+        return Handler._positive_integer(values[0], "history cursor") if values else None
+
+    @staticmethod
+    def _positive_integer(value: str, label: str) -> int:
+        if not value.isascii() or not value.isdecimal() or len(value) > 19:
+            raise HomeError(f"Invalid {label}")
+        parsed = int(value)
+        if not 1 <= parsed <= 2**63 - 1:
+            raise HomeError(f"Invalid {label}")
+        return parsed
+
+    @staticmethod
     def _fields(body: dict[str, Any], allowed: set[str]) -> None:
         if set(body) - allowed:
             raise ValueError("Unexpected action fields")
 
     def do_POST(self) -> None:
         if not self._origin_ok() or not self._require_auth():
-            return
-        if not same_secret(self.headers.get("X-CSRF-Token", ""), self.server.csrf):
-            self._json({"error": "Refresh Home before sending this action"}, 403)
             return
         try:
             body = self._body()
@@ -219,13 +269,16 @@ class Handler(BaseHTTPRequestHandler):
                 result = self.server.store.create_room(body.get("title", "Commons"))
             elif len(parts) == 4 and parts[:2] == ["api", "rooms"] and parts[3] == "rounds":
                 self._fields(body, {"text", "participants", "request_id", "mode", "artifact_ids"})
-                result = self.server.council.start(parts[2], body.get("text"), body.get("participants"), body.get("request_id"), body.get("mode", "council"), body.get("artifact_ids"))
+                saved = self.server.council.start(parts[2], body.get("text"), body.get("participants"), body.get("request_id"), body.get("mode", "council"), body.get("artifact_ids"))
+                result = self.server.store.round_for_browser(saved["id"])
             elif len(parts) == 4 and parts[:2] == ["api", "rounds"] and parts[3] == "cancel":
                 self._fields(body, set())
-                result = self.server.council.cancel(parts[2])
+                saved = self.server.council.cancel(parts[2])
+                result = self.server.store.round_for_browser(saved["id"])
             elif len(parts) == 4 and parts[:2] == ["api", "rounds"] and parts[3] == "resume":
                 self._fields(body, set())
-                result = self.server.council.resume(parts[2], retry_interrupted=False)
+                saved = self.server.council.resume(parts[2], retry_interrupted=False)
+                result = self.server.store.round_for_browser(saved["id"])
             elif parts == ["api", "agents"]:
                 # Only a configured binding_id is accepted; executable, workspace, session and
                 # model stay in local trusted configuration.

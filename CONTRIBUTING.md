@@ -38,11 +38,13 @@ node --check home/web/resident-directory.js
 node --check home/web/room.js
 python scripts/check_public_tree.py
 python scripts/check_public_tree.py --tracked
+python scripts/check_public_tree.py --history
+node --check home/web/http.js
 python -m ruff check home tests scripts
 python -m mypy home
 ```
 
-CI runs on Ubuntu and Windows with Python 3.11 and 3.13. Default privacy scanning checks working files, including new docs; `--tracked` reads actual committed HEAD blobs. Neither substitutes for reviewing the pending index.
+CI runs on Ubuntu and Windows with Python 3.11 and 3.13. Default privacy scanning checks working files, including new docs; `--tracked` reads actual committed HEAD blobs, and `--history` reads reachable commit trees/metadata from a complete checkout. Neither substitutes for reviewing the pending index. Retain old reviewed asset hashes when replacing a binary so history remains inspectable.
 
 Tests should establish observable behavior: shared context, attribution, duplicate handling, cancellation, recovery and versions. Avoid tests that only restate implementation. Keep native provider smoke runs opt-in because they consume usage and require an account.
 

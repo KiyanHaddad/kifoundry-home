@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 — 2026-10-06
+
+- Include the documentation, examples and publication scanner in source distributions.
+- Keep a confirmed draft save selected even when the following conversation refresh fails, so retrying Save targets the saved draft and version.
+
+- Require an origin-scoped browser proof as well as the cookie on every private API request. A cookie captured by a different localhost port cannot access records or mint a new proof.
+- Bound HTTP handlers to 16 and active round drivers to 8 by default. Session aliases wait before executor submission, keeping workers available for unrelated providers.
+- Page conversation/version metadata in groups of 100, fetch exact draft bodies on selection and omit duplicated replies/native session IDs from browser progress responses. Preserve full saved history and trusted Python readback.
+- Add schema 3 indexes without rewriting saved content. Create new POSIX data directories/database files with private permissions; existing permissions remain unchanged.
+- Scan reachable Git history and commit metadata, detect literal credential assignments, pin CI actions and disable persisted checkout credentials.
+- Add security, growth, recovery and browser transport regressions. Document the threat model and remaining scale limits in SECURITY.md.
 
 - Rewrote the README around downloading and using the application, with an actual clean-demo screenshot.
 - Added getting started, user, privacy/data and troubleshooting guides plus a documentation index. Separated demo and native data paths in the examples.

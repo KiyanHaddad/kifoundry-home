@@ -11,7 +11,7 @@ from home.council import Council
 from home.fixture import FixtureProvider
 from home.models import Agent, ConflictError, ProviderError, ValidationError
 from home.residents import ResidentBinding, Seed, demo_registry, fixture_binding
-from home.store import MIGRATIONS, Store
+from home.store import MIGRATIONS, SCHEMA_VERSION, Store
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
 
@@ -437,7 +437,7 @@ class SchemaUpgrade(unittest.TestCase):
                 # A legacy speaker with no saved name and no registry row stays unknown, not invented.
                 self.assertIn("[Unknown resident] old answer", store.round_context(new["id"]))
                 version = store._db.execute("PRAGMA user_version").fetchone()[0]
-                self.assertEqual(version, 2)
+                self.assertEqual(version, SCHEMA_VERSION)
             finally:
                 council.close()
                 store.close()

@@ -6,7 +6,7 @@
 | `No module named home` | Run from the extracted folder containing `home/`, or use the Python environment where you installed the package. |
 | `tomllib` is missing | The selected interpreter is older than Python 3.11. Check its version. |
 | Browser cannot connect | Keep the server terminal running. Restart with the same data directory and `--open`. |
-| Local page opens but is unauthorized | Use the current private launch URL printed by the server, or restart with `--open`. Bare localhost navigation is not a fresh login. |
+| Local page opens but is unauthorized | Reload the authenticated tab. If it is closed, storage is blocked, or the printed token was already used, restart with the same data folder and `--open` for a fresh launcher. Bare localhost navigation is not a fresh login. |
 | Port is already in use | Add `--port 8788` or `--port 0`. |
 | Another Home owns the data | Stop the other Home process cleanly. Use a different data directory for a separate town. |
 | Configuration workspace does not exist | `workspace` is resolved relative to the TOML file. Point it to an existing directory. |

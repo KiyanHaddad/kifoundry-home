@@ -77,6 +77,6 @@ The native providers consume your account's usage. Begin with a single resident 
 
 Without `--data-dir`, Windows uses `%LOCALAPPDATA%\KiFoundryHome`; macOS/Linux uses `$XDG_DATA_HOME/kifoundry-home`, or `~/.local/share/kifoundry-home` when XDG is unset. Demo and native mode currently share that default, so the examples use separate explicit directories.
 
-If the browser does not open, use the **private local launch URL** printed in the terminal. A bare `localhost` address does not establish a new authenticated session. Do not share launch URLs.
+If the browser does not open, use the **private local launch URL** printed in the terminal. It works once. Reloading the authenticated tab retains its private proof. For a new tab after that token was consumed, stop/restart Home with the same data directory and use its fresh launcher. A bare `localhost` address does not establish a new session. Do not share launch URLs.
 
 Next: [use conversations and saved work](USING.md), [back up your data](PRIVACY.md), or [fix a setup problem](TROUBLESHOOTING.md).

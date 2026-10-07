@@ -10,7 +10,9 @@
 | Native provider sign-in and provider session files | The installed provider CLI's own storage |
 | Source, original artwork, examples and documentation | This repository |
 
-Home serves on loopback and uses a private launch cookie, Host/Origin checks and CSRF protection. It is intended for local use. Do not expose the server through a public tunnel as a multi-user service.
+Home serves on loopback and uses a private cookie plus a separate origin-scoped browser proof, Host/Origin checks and CSRF protection. Every private API read/action requires both the cookie and proof. The proof stays in the tab's session storage; cookies alone cannot authenticate across localhost ports. Reload the authenticated tab, or restart the server for a fresh launcher when opening a new tab. See [security boundaries](../SECURITY.md).
+
+New POSIX data roots/database files are created with private permissions. Existing permissions remain unchanged; check access to an existing/shared folder yourself. Windows uses inherited filesystem ACLs. Home does not encrypt the database.
 
 ## What leaves your computer?
 
@@ -40,6 +42,7 @@ The documented `.demo-data` and `.home-data` directories are ignored by Git. Ign
 ```sh
 git diff --cached --stat
 python scripts/check_public_tree.py --staged
+python scripts/check_public_tree.py --history
 ```
 
-The scanner reports paths and finding categories rather than matched secret values. It checks known patterns and reviewed binary hashes; a clean result still needs human review for private prose, unknown credential formats and image contents. Check Git history as well as the current files if private content was ever committed. Deleting it from the latest version alone does not remove older commits.
+The scanner reports paths and finding categories rather than matched secret values. History mode inspects all reachable commit trees and metadata from a complete checkout; a shallow clone is rejected. Known patterns and reviewed binary hashes still need human review for private prose, unknown credential formats and image contents. Deleting private content from the latest version alone does not remove older commits. See [publication coverage](../SECURITY.md#publication-checks).

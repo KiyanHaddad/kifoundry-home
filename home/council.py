@@ -29,8 +29,9 @@ import logging
 import threading
 import uuid
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor, wait
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any
 
 from .models import (
@@ -261,6 +262,15 @@ class _Control:
     roster: dict[str, tuple[Agent, Provider]] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class _PendingCall:
+    turn_id: str
+    agent: Agent
+    adapter: Provider
+    prompt: str
+    identity: str
+
+
 class Council:
     """Orchestration plus the live resident registry.
 
@@ -274,7 +284,12 @@ class Council:
 
     def __init__(self, store: Store, agents: dict[str, Agent] | None = None,
                  adapters: dict[str, Provider] | None = None, max_workers: int = 4, *,
-                 bindings: list[ResidentBinding] | None = None, seeds: list[Seed] | None = None) -> None:
+                 bindings: list[ResidentBinding] | None = None, seeds: list[Seed] | None = None,
+                 max_active_rounds: int = 8) -> None:
+        if type(max_workers) is not int or not 1 <= max_workers <= 32:
+            raise ValueError("max_workers must be an integer between 1 and 32")
+        if type(max_active_rounds) is not int or not 1 <= max_active_rounds <= 64:
+            raise ValueError("max_active_rounds must be an integer between 1 and 64")
         agents = dict(agents or {})
         adapters = dict(adapters or {})
         for agent_id, agent in agents.items():
@@ -305,9 +320,13 @@ class Council:
                 raise ValueError(f"resident ID {seed.agent.id!r} is not a safe identifier")
         self.store = store
         self._max_workers = max_workers
+        self._max_active_rounds = max_active_rounds
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="home-call")
-        self._identity_locks: dict[str, threading.Lock] = {}
-        self._guard = threading.Lock()
+        # Reserve identities before executor submission. An alias waiting for its
+        # session must not occupy a worker needed by an unrelated ready provider.
+        self._busy_identities: set[str] = set()
+        self._guard = threading.RLock()
+        self._ready = threading.Condition(self._guard)
         self._registry_lock = threading.RLock()
         self._controls: dict[str, _Control] = {}
         self._drivers: dict[str, threading.Thread] = {}
@@ -377,6 +396,7 @@ class Council:
         """The limits this server actually validates and runs with."""
         return {"max_residents": MAX_RESIDENTS, "max_participants": MAX_PARTICIPANTS,
                 "max_provider_calls": 2 * MAX_PARTICIPANTS + 1, "max_workers": self._max_workers,
+                "max_active_rounds": self._max_active_rounds,
                 "max_prompt_bytes": MAX_PROMPT_BYTES}
 
     def bindings_info(self) -> list[dict[str, str]]:
@@ -390,6 +410,15 @@ class Council:
         if busy:
             raise ConflictError("Residents can change once current conversations finish, including calls "
                                 "still finishing after Stop")
+
+    def _require_capacity(self) -> None:
+        """Called under the registry lock before a request can change persistent state."""
+        with self._guard:
+            if self._closing.is_set():
+                raise ConflictError("KiFoundry Home is shutting down")
+            if len(self._drivers) >= self._max_active_rounds:
+                raise ConflictError("Home is at its active conversation limit; wait for a conversation "
+                                    "to finish, including calls still finishing after Stop")
 
     def add_resident(self, name: Any, role: Any, binding_id: Any) -> dict[str, Any]:
         binding = self._bindings.get(binding_id) if isinstance(binding_id, str) else None
@@ -469,6 +498,7 @@ class Council:
             existing = self.store.round_for_request(request_id, request_sha)
             if existing is not None:
                 return existing  # idempotent repeat, even if the registry changed since
+            self._require_capacity()
             self._require_dispatchable(participants)
             names = {key: row["name"] for key, row in self._residents.items()}
             snapshots = {p: {"name": self.agents[p].name, "provider": self.agents[p].provider,
@@ -494,10 +524,11 @@ class Council:
         return self.store.round(saved["id"])
 
     def cancel(self, round_id: str) -> dict[str, Any]:
-        with self._guard:
+        with self._ready:
             control = self._controls.get(round_id)
-        if control is not None:
-            control.cancel.set()
+            if control is not None:
+                control.cancel.set()
+                self._ready.notify_all()
         return self.store.cancel_round(round_id)
 
     def resume(self, round_id: str, retry_interrupted: bool = False) -> dict[str, Any]:
@@ -519,6 +550,7 @@ class Council:
             if saved["status"] not in ("interrupted", "cancelled"):
                 raise ConflictError(f"Only an interrupted or stopped round can resume (this one is {saved['status']})")
             roster = self._roster(saved)
+            self._require_capacity()
             self.store.reactivate_round(round_id)
             self._launch(round_id, retry_launched=retry_interrupted, roster=roster)
         return self.store.round(round_id)
@@ -526,12 +558,13 @@ class Council:
     def close(self, timeout: float = 10.0) -> None:
         """Stop owned work: in-flight calls are told to cancel, drivers are joined with a bound.
         Rounds still unfinished afterwards are marked interrupted by the next startup."""
-        self._closing.set()
-        with self._guard:
-            controls = list(self._controls.values())
-            drivers = list(self._drivers.values())
-        for control in controls:
-            control.cancel.set()
+        with self._registry_lock:
+            self._closing.set()
+            with self._ready:
+                drivers = list(self._drivers.values())
+                for control in self._controls.values():
+                    control.cancel.set()
+                self._ready.notify_all()
         per_thread = timeout / max(1, len(drivers))
         for driver in drivers:
             driver.join(per_thread)
@@ -667,7 +700,7 @@ class Council:
 
     def _phase(self, round_id: str, phase: str, agent_ids: list[str], prompt_for: Callable[[str], str],
                control: _Control, session_id: str | None = None) -> None:
-        futures: list[Future[None]] = []
+        pending: list[_PendingCall] = []
         for agent_id in agent_ids:
             turn = self.store.ensure_turn(round_id, agent_id, phase)
             if turn is None:
@@ -677,52 +710,90 @@ class Council:
             agent, adapter = control.roster[agent_id]
             try:
                 prompt = prompt_for(agent_id)
+                identity = adapter.identity_key(session_id)
+                if not isinstance(identity, str) or not identity:
+                    raise ProviderError("The provider returned an invalid session identity")
             except ValidationError as error:  # cannot fit the prompt limit: fail safely, no call
                 self.store.end_turn(turn["id"], "failed", str(error))
                 continue
-            futures.append(self._pool.submit(self._call, turn["id"], agent, adapter, prompt, session_id,
-                                             control, phase == "reply"))
-        wait(futures)
-        for future in futures:
-            if future.exception() is not None:
-                raise future.exception()  # type: ignore[misc]
+            except Exception as error:  # noqa: BLE001 - adapter identity bugs become attributed failures.
+                self.store.end_turn(turn["id"], "failed", _safe_error(agent, error))
+                continue
+            pending.append(_PendingCall(turn["id"], agent, adapter, prompt, identity))
 
-    def _identity_lock(self, key: str) -> threading.Lock:
-        with self._guard:
-            return self._identity_locks.setdefault(key, threading.Lock())
+        futures: dict[Future[None], str] = {}
+        errors: list[BaseException] = []
+
+        def ready() -> bool:
+            return any(f.done() for f in futures) or (bool(pending) and (
+                control.cancel.is_set() or any(c.identity not in self._busy_identities for c in pending)))
+
+        with self._ready:
+            while pending or futures:
+                for future in list(futures):
+                    if not future.done():
+                        continue
+                    turn_id = futures.pop(future)
+                    if future.cancelled():
+                        self.store.end_turn(turn_id, self._stop_status(), "stopped before launch")
+                    elif (failure := future.exception()) is not None:
+                        errors.append(failure)
+                if control.cancel.is_set():
+                    for call in pending:
+                        self.store.end_turn(call.turn_id, self._stop_status(), "stopped before launch")
+                    pending.clear()
+                else:
+                    waiting = []
+                    for call in pending:
+                        if call.identity in self._busy_identities:
+                            waiting.append(call)
+                            continue
+                        self._busy_identities.add(call.identity)
+                        try:
+                            future = self._pool.submit(self._call, call.turn_id, call.agent, call.adapter,
+                                                       call.prompt, session_id, control, phase == "reply")
+                        except RuntimeError:
+                            self._busy_identities.remove(call.identity)
+                            self.store.end_turn(call.turn_id, "interrupted", "stopped before launch")
+                            control.cancel.set()
+                            continue
+                        futures[future] = call.turn_id
+                        future.add_done_callback(partial(self._release_identity, call.identity))
+                    pending = waiting
+                if pending or futures:
+                    self._ready.wait_for(ready)
+        if errors:
+            raise errors[0]
+
+    def _release_identity(self, key: str, _future: Future[None]) -> None:
+        with self._ready:
+            self._busy_identities.remove(key)
+            self._ready.notify_all()
 
     def _stop_status(self) -> str:
         return "interrupted" if self._closing.is_set() else "cancelled"
 
     def _call(self, turn_id: str, agent: Agent, adapter: Provider, prompt: str, session_id: str | None,
               control: _Control, save_session: bool) -> None:
-        lock = self._identity_lock(adapter.identity_key(session_id))
-        while not lock.acquire(timeout=0.05):
-            if control.cancel.is_set():
-                self.store.end_turn(turn_id, self._stop_status(), "stopped before launch")
-                return
+        if control.cancel.is_set():
+            self.store.end_turn(turn_id, self._stop_status(), "stopped before launch")
+            return
+        if not self.store.claim_turn(turn_id):
+            return
         try:
-            if control.cancel.is_set():
-                self.store.end_turn(turn_id, self._stop_status(), "stopped before launch")
-                return
-            if not self.store.claim_turn(turn_id):
-                return
-            try:
-                reply = adapter.generate(prompt, session_id, control.cancel)
-            except Exception as error:  # noqa: BLE001 - adapter bugs must become attributed failed turns.
-                if control.cancel.is_set() or isinstance(error, Cancelled):
-                    self.store.end_turn(turn_id, self._stop_status(), "stopped while running; no reply was saved")
-                else:
-                    self.store.end_turn(turn_id, "failed", _safe_error(agent, error))
-                return
-            problem = _check_reply(agent, reply, session_id)
-            if problem:
-                self.store.end_turn(turn_id, "failed", problem)
-                return
-            # A final reply that actually arrived is kept even if Stop was pressed meanwhile.
-            self.store.complete_turn(turn_id, reply, save_session=save_session, speaker_name=agent.name)
-        finally:
-            lock.release()
+            reply = adapter.generate(prompt, session_id, control.cancel)
+        except Exception as error:  # noqa: BLE001 - adapter bugs must become attributed failed turns.
+            if control.cancel.is_set() or isinstance(error, Cancelled):
+                self.store.end_turn(turn_id, self._stop_status(), "stopped while running; no reply was saved")
+            else:
+                self.store.end_turn(turn_id, "failed", _safe_error(agent, error))
+            return
+        problem = _check_reply(agent, reply, session_id)
+        if problem:
+            self.store.end_turn(turn_id, "failed", problem)
+            return
+        # A final reply that actually arrived is kept even if Stop was pressed meanwhile.
+        self.store.complete_turn(turn_id, reply, save_session=save_session, speaker_name=agent.name)
 
 
 def _safe_error(agent: Agent, error: Exception) -> str:

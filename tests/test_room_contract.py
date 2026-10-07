@@ -68,7 +68,7 @@ class RoomContractTests(unittest.TestCase):
             )
             persisted = store.room(room["id"])
 
-        # This is the real HTTP room payload: one latest artifact nests both versions.
+        # Trusted full readback nests all bodies; the browser also accepts paged metadata.
         self.assertEqual(1, len(persisted["artifacts"]))
         self.assertEqual(revision["content"], persisted["artifacts"][0]["content"])
         self.assertEqual(2, len(persisted["artifacts"][0]["versions"]))
@@ -88,6 +88,21 @@ class RoomContractTests(unittest.TestCase):
         self.assertEqual(persisted["id"], browser["normalized"]["id"])
         self.assertEqual(persisted["messages"], browser["normalized"]["messages"])
         self.assertEqual(persisted["rounds"], browser["normalized"]["rounds"])
+
+    def test_browser_metadata_keeps_latest_version_and_history_cursor_without_bodies(self):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            closing(Store(Path(directory) / "home.sqlite3")) as store,
+        ):
+            room = store.create_room("Bounded studio")
+            saved = store.save_artifact(room["id"], "Opening", "Original text")
+            store.save_artifact(room["id"], "Opening", "Revised text", saved["id"], 1)
+            payload = store.room_for_browser(room["id"])
+        browser = self.normalize(payload)["normalized"]
+        self.assertEqual(payload["artifacts"], browser["artifacts"])
+        self.assertTrue(all("content" not in item for item in browser["artifacts"]))
+        self.assertTrue(all(item["latest_version"] == 2 for item in browser["artifacts"]))
+        self.assertIsNone(browser["next_artifact_cursor"])
 
     def test_flat_version_payload_remains_usable_without_nested_versions(self):
         with (

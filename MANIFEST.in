@@ -1,0 +1,10 @@
+include AGENTS.md ASSETS.md CHANGELOG.md CONTRIBUTING.md DESIGN.md LICENSE
+include PRODUCT.md README.md SECURITY.md pyproject.toml .gitignore
+include .github/workflows/ci.yml
+recursive-include docs *.md *.txt *.json *.jpg
+recursive-include examples *.toml *.txt *.json
+recursive-include scripts *.py
+recursive-include tests *.py
+recursive-include home *.py *.txt
+recursive-include home/web *.html *.js *.css *.svg *.webp *.ttf
+global-exclude __pycache__ *.py[cod] .DS_Store

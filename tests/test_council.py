@@ -31,12 +31,12 @@ class CouncilCase(unittest.TestCase):
             self.store.close()
             self.store = None
 
-    def build(self, adapters, roles=None):
+    def build(self, adapters, roles=None, **council_options):
         self.shutdown()
         self.store = Store(self.path)
         agents = {key: Agent(key, key.title(), "fixture", (roles or {}).get(key, "")) for key in adapters}
         self.adapters = adapters
-        self.council = Council(self.store, agents, adapters)
+        self.council = Council(self.store, agents, adapters, **council_options)
         return self.store.create_room("Commons")["id"] if not self.store.list_rooms() else \
             self.store.list_rooms()[0]["id"]
 
@@ -132,6 +132,99 @@ class CouncilFlow(CouncilCase):
 
 
 class Admission(CouncilCase):
+    def test_driver_limit_rejects_before_save_but_allows_idempotent_repeat(self):
+        gate = threading.Event()
+        self.addCleanup(gate.set)
+        adapter = FixtureProvider("ada", gate=gate, ignore_cancel=True)
+        room = self.build({"ada": adapter}, max_active_rounds=2)
+        other = self.store.create_room("Other")['id']
+        refused = self.store.create_room("Refused")['id']
+        first = self.council.start(room, "one", ["ada"], "capacity-one", mode="direct")
+        self.wait_for(lambda: len(adapter.calls) == 1)
+        second = self.council.start(other, "two", ["ada"], "capacity-two", mode="direct")
+        self.assertEqual(first["id"], self.council.start(
+            room, "one", ["ada"], "capacity-one", mode="direct")["id"])
+        self.council.cancel(first["id"])
+        with self.assertRaises(ConflictError):
+            self.council.start(refused, "must not be saved", ["ada"], "capacity-three", mode="direct")
+        self.assertEqual([], self.store.room(refused)["messages"])
+        self.assertEqual([], self.store.room(refused)["rounds"])
+        self.assertEqual(2, len(self.council._drivers))
+        self.assertEqual(2, self.council.capabilities_info()["max_active_rounds"])
+        gate.set()
+        self.settle(first["id"])
+        self.settle(second["id"])
+        self.wait_for(lambda: not self.council._drivers)
+        done = self.settle(self.council.start(
+            refused, "now accepted", ["ada"], "capacity-four", mode="direct")["id"])
+        self.assertEqual("completed", done["status"])
+
+    def test_resume_checks_capacity_before_reactivating_saved_round(self):
+        gate = threading.Event()
+        self.addCleanup(gate.set)
+        adapter = FixtureProvider("ada", gate=gate)
+        room = self.build({"ada": adapter}, max_active_rounds=1)
+        stopped = self.council.start(room, "stopped", ["ada"], "resume-old", mode="direct")
+        self.wait_for(lambda: len(adapter.calls) == 1)
+        self.council.cancel(stopped["id"])
+        self.settle(stopped["id"])
+        self.wait_for(lambda: not self.council._drivers)
+        other = self.store.create_room("Busy")['id']
+        active = self.council.start(other, "busy", ["ada"], "resume-busy", mode="direct")
+        with self.assertRaises(ConflictError):
+            self.council.resume(stopped["id"])
+        self.assertEqual("cancelled", self.store.round(stopped["id"])["status"])
+        old_room = next(summary for summary in self.store.list_rooms() if summary["id"] == room)
+        self.assertIsNone(old_room["active_round_id"])
+        gate.set()
+        self.settle(active["id"])
+        self.wait_for(lambda: not self.council._drivers)
+        self.council.resume(stopped["id"])
+        done = self.settle(stopped["id"])
+        self.assertEqual("interrupted", done["status"])
+        self.assertEqual(2, len(adapter.calls), "An uncertain launched call must not be repeated")
+
+    def test_concurrent_rooms_share_one_finite_admission_limit(self):
+        gate = threading.Event()
+        self.addCleanup(gate.set)
+        self.build({"ada": FixtureProvider("ada", gate=gate)}, max_active_rounds=2)
+        rooms = [self.store.create_room(f"Room {i}")["id"] for i in range(8)]
+        barrier = threading.Barrier(8)
+        accepted, rejected, errors = [], [], []
+
+        def submit(index, room):
+            barrier.wait()
+            try:
+                accepted.append(self.council.start(
+                    room, "bounded", ["ada"], f"concurrent-{index}", mode="direct")["id"])
+            except ConflictError:
+                rejected.append(room)
+            except Exception as error:  # noqa: BLE001 - surface unexpected worker errors in the assertion.
+                errors.append(error)
+
+        threads = [threading.Thread(target=submit, args=(i, room)) for i, room in enumerate(rooms)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(3)
+        self.assertFalse(any(thread.is_alive() for thread in threads))
+        self.assertEqual([], errors)
+        self.assertEqual((2, 6), (len(accepted), len(rejected)))
+        self.assertTrue(all(not self.store.room(room)["messages"] for room in rejected))
+        gate.set()
+        for round_id in accepted:
+            self.settle(round_id)
+
+    def test_execution_limits_reject_noninteger_or_unbounded_values(self):
+        self.store = Store(self.path)
+        for option, invalids in (
+            ("max_workers", (0, -1, 33, True, 1.5, float("nan"), float("inf"))),
+            ("max_active_rounds", (0, -1, 65, False, 1.5, float("nan"), float("inf"))),
+        ):
+            for invalid in invalids:
+                with self.subTest(option=option, value=invalid), self.assertRaises(ValueError):
+                    Council(self.store, **{option: invalid})
+
     def test_duplicate_submit_returns_same_round_and_mismatch_rejects(self):
         adapters = {"ada": FixtureProvider("ada", delay=0.05)}
         room = self.build(adapters)
@@ -195,6 +288,69 @@ class Admission(CouncilCase):
 
 
 class Exclusivity(CouncilCase):
+    def test_waiting_aliases_leave_workers_for_an_unrelated_ready_provider(self):
+        gate = threading.Event()
+        self.addCleanup(gate.set)
+        held = FixtureProvider("held", gate=gate, bound_identity="shared-session")
+        free = FixtureProvider("free")
+        room = self.build({"held": held, "free": free}, max_workers=2)
+        first = self.council.start(room, "held", ["held"], "held-one", mode="direct")
+        self.wait_for(lambda: len(held.calls) == 1)
+        alias_room = self.store.create_room("Alias")['id']
+        alias = self.council.start(alias_room, "alias", ["held"], "held-two", mode="direct")
+        unrelated_room = self.store.create_room("Unrelated")['id']
+        unrelated = self.council.start(
+            unrelated_room, "ready", ["free"], "free-one", mode="direct")
+        self.assertEqual("completed", self.settle(unrelated["id"])["status"])
+        self.assertEqual(1, len(held.calls), "The held identity must remain serialized")
+        self.assertFalse(gate.is_set(), "The unrelated reply must arrive while the first call is held")
+        self.assertFalse(self.store.round(alias["id"])["turns"][0]["launched"])
+        gate.set()
+        self.settle(first["id"])
+        self.settle(alias["id"])
+        self.wait_for(lambda: not self.council._drivers)
+        self.assertEqual(set(), self.council._busy_identities, "Idle identity reservations must be retired")
+
+    def test_stop_wakes_an_alias_waiter_without_launching_it_and_resume_is_safe(self):
+        gate = threading.Event()
+        self.addCleanup(gate.set)
+        held = FixtureProvider("held", gate=gate, bound_identity="shared-session")
+        room = self.build({"held": held}, max_workers=1)
+        first = self.council.start(room, "held", ["held"], "stop-held", mode="direct")
+        self.wait_for(lambda: len(held.calls) == 1)
+        alias_room = self.store.create_room("Alias")['id']
+        alias = self.council.start(alias_room, "alias", ["held"], "stop-waiting", mode="direct")
+        self.wait_for(lambda: self.store.round(alias["id"])["status"] == "running")
+        self.council.cancel(alias["id"])
+        done = self.settle(alias["id"])
+        self.wait_for(lambda: alias["id"] not in self.council._drivers)
+        self.assertEqual("cancelled", done["turns"][0]["status"])
+        self.assertFalse(done["turns"][0]["launched"])
+        self.assertEqual(1, len(held.calls))
+        gate.set()
+        self.settle(first["id"])
+        self.wait_for(lambda: not self.council._drivers)
+        self.council.resume(alias["id"])
+        self.assertEqual("completed", self.settle(alias["id"])["status"])
+        self.assertEqual(2, len(held.calls))
+
+    def test_close_wakes_identity_waiters_and_releases_reservations(self):
+        gate = threading.Event()
+        self.addCleanup(gate.set)
+        held = FixtureProvider("held", gate=gate, bound_identity="shared-session")
+        room = self.build({"held": held}, max_workers=1)
+        first = self.council.start(room, "held", ["held"], "close-held", mode="direct")
+        self.wait_for(lambda: len(held.calls) == 1)
+        other = self.store.create_room("Alias")['id']
+        second = self.council.start(other, "alias", ["held"], "close-waiting", mode="direct")
+        self.council.close(timeout=2)
+        self.assertEqual({}, self.council._drivers)
+        self.assertEqual(set(), self.council._busy_identities)
+        self.assertEqual(1, len(held.calls))
+        self.assertEqual("interrupted", self.store.round(first["id"])["status"])
+        self.assertEqual("interrupted", self.store.round(second["id"])["status"])
+        self.assertFalse(self.store.round(second["id"])["turns"][0]["launched"])
+
     def test_aliases_of_one_bound_session_never_overlap_across_rooms(self):
         adapters = {"resident": FixtureProvider("resident", delay=0.1, bound_identity="one-session"),
                     "alias": FixtureProvider("alias", delay=0.1, bound_identity="one-session")}

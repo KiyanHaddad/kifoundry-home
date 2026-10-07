@@ -2,6 +2,9 @@
 
 This development alpha is progressing toward the full shared-home journey. Hands-on user acceptance remains open.
 
+- This is an authenticated loopback application for one owner. See [security/resource boundaries](../SECURITY.md), including native integration trust, large same-room metadata sorting, unpaginated archives and persistent disk growth.
+- Reloading an authenticated tab retains its proof. A fresh tab after the launch token was consumed needs a server restart and new launcher.
+
 - Download is source code; no desktop installer or guided provider setup is shipped. Binding availability does not establish native sign-in or quota.
 - Demo and native modes share the default data folder. Use the separate explicit paths in [getting started](QUICKSTART.md).
 - Commons currently selects all available residents. Review the guest list and call bound before Send.

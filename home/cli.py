@@ -17,7 +17,7 @@ def create_app(data_dir: Path, config: Path | None, demo: bool, port: int):
     from .server import HomeServer
     from .store import Store
 
-    data_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     if demo:
         bindings, seeds = demo_registry()
     else:
@@ -26,7 +26,7 @@ def create_app(data_dir: Path, config: Path | None, demo: bool, port: int):
         bindings, seeds = native_registry(load_bindings(config))
     store = Store(data_dir / "home.sqlite")
     try:
-        if not store.list_rooms():
+        if not store.list_rooms_page()["rooms"]:
             store.create_room()
         council = Council(store, bindings=bindings, seeds=seeds)
         try:

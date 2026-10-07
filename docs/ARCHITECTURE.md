@@ -49,6 +49,8 @@ New rounds freeze each participant's name, provider and role. Completed replies 
 
 Store owns the cooperating database lock. It prevents a second Home process from performing competing recovery against that database; it does not control unrelated provider terminals.
 
+Schema 3 adds room lookup indexes. HTTP uses bounded browser projections: 100 room/version metadata entries per page, 200 recent messages and 50 round summaries. Exact draft bodies load on selection; trusted full Store readback remains available. Active round drivers are limited to eight by default, HTTP handlers to 16, and provider workers to four. Identity reservations precede executor submission so waiting aliases cannot consume worker slots. These local limits do not establish multi-user capacity; see [security and growth boundaries](../SECURITY.md).
+
 Future data imports require an explicit migration that preserves the source. Provider memory and session histories are never copied implicitly.
 
 ## Extension discipline

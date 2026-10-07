@@ -8,6 +8,7 @@
 | [Provider setup](PROVIDERS.md) | How do I connect Claude Code or Codex? |
 | [Using the home](USING.md) | How do I talk, run Council and save revisions? |
 | [Privacy and data](PRIVACY.md) | What stays local, what is sent, and what should I back up? |
+| [Security boundaries](../SECURITY.md) | What protects local access, and what are its limits? |
 | [Troubleshooting](TROUBLESHOOTING.md) | What do I do when setup or a reply fails? |
 
 ## Understand its current state

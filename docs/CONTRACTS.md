@@ -104,7 +104,7 @@ For `N` participants, where `2 <= N <= 64`:
 | Critique | Participants whose proposals completed, if at least two proposals succeeded. | The frozen context and all saved proposal outcomes, with attribution and failure status. |
 | Synthesis | First selected participant with a completed critique; otherwise the first with a completed proposal. | The frozen context and saved proposal/critique outcomes. |
 
-The limit is **at most `2N+1` calls**, with four concurrent workers by default and no recursive automatic rounds. A Council with one successful proposal preserves it and skips critique/synthesis. With no successful proposals, it ends failed or interrupted according to the saved outcomes.
+The limit is **at most `2N+1` calls**, with four concurrent workers and eight active round drivers across rooms by default. Worker limits must be integers 1–32; active-driver limits 1–64. Capacity is checked before saving/reactivating, while identical request retries still return their saved round. Identity reservations happen before executor submission, so aliases waiting for a busy session do not occupy workers. There are no recursive automatic rounds. A Council with one successful proposal preserves it and skips critique/synthesis. With no successful proposals, it ends failed or interrupted according to the saved outcomes.
 
 Actual replies retain speaker, provider, phase and reported session/model. Successful contributions survive other participants' failures. Synthesis is instructed to attribute points, preserve disagreements in an `Unresolved` section, and avoid inventing votes or agreement. These instructions do not guarantee model compliance.
 
@@ -147,13 +147,17 @@ Store owns a cooperating database lock to prevent two Home servers from performi
 
 ## 5. Persistence interface
 
-`Store(path: Path | str)` owns schema migrations and returns JSON-serializable dictionaries from its public record operations. Schema 2 incrementally migrates schema 1 while preserving history. An unknown future schema is rejected without rewriting it.
+`Store(path: Path | str)` owns schema migrations and returns JSON-serializable dictionaries from its public record operations. Schema 2 adds the registry; schema 3 adds lookup indexes. Both incrementally preserve history. An unknown future schema is rejected without rewriting it.
 
 | Operation | Result / rule |
 | --- | --- |
 | `create_room(title="Commons")` | `{id, title, created_at}`. |
 | `list_rooms()` | Room summaries, including `active_round_id`. |
 | `room(room_id)` | Room metadata, recent messages/rounds and all saved artifact versions. Default readback is the latest 200 messages and 50 rounds; `earlier_messages` counts omitted messages. This does not delete older records. |
+| `list_rooms_page(before=None)` | Up to 100 newest room summaries and `next_room_cursor`. |
+| `room_for_browser(room_id)` | Recent messages/round summaries plus 100 version metadata records and `next_artifact_cursor`; no duplicate turn bodies or native session IDs. |
+| `artifact_page(room_id, before=None)` | Up to 100 version metadata records and a next cursor. Bodies are not read into the response. |
+| `artifact_version(room_id, artifact_id, version)` | One exact immutable body with authoritative `latest_version`; reject cross-room access. |
 | `save_artifact(room_id, title, content, artifact_id=None, expected_version=None)` | Create version 1 or append an immutable version. Updating requires the current `expected_version`; a conflict must not overwrite history. |
 | `residents()` | All registry rows, including archives. |
 | `seed_residents(rows)` | Apply the restart-seeding rules above. |
@@ -166,7 +170,7 @@ Store also owns the internal round/turn, session and recovery operations. Keep t
 
 ```python
 Council(store, agents=None, adapters=None, max_workers=4,
-        *, bindings=None, seeds=None)
+        *, bindings=None, seeds=None, max_active_rounds=8)
 ```
 
 Managed integrations supply `bindings` and `seeds`. The `agents`/`adapters` arguments remain supported for static integrations.
@@ -186,14 +190,17 @@ Construction recovers persisted unfinished rounds without relaunching them. `ava
 
 ## 6. Local HTTP API
 
-The server binds to loopback only. Host/Origin validation, a private cookie and CSRF protection guard the API. Cookies are `HttpOnly`, `SameSite=Strict` and named with the actual bound port; sibling Home servers cannot authenticate with each other's cookies or CSRF tokens.
+The server binds to loopback only. Host/Origin validation, a private cookie and a separate origin-scoped proof guard the API. Cookies are `HttpOnly`, `SameSite=Strict` and named with the actual bound port. Cookies are shared across ports, so the cookie alone cannot authorize private requests. At most 16 HTTP handlers are admitted before reading headers; inactive sockets time out after 10 seconds.
 
-`GET /api/session` exchanges a valid one-use launcher token or an existing authenticated cookie for `{csrf}`. It performs no model call or domain mutation. All other API routes require the private local cookie; every POST also requires `X-CSRF-Token` and a JSON object body. Unexpected action fields are rejected. There is no arbitrary filesystem route.
+`GET /api/session` exchanges a valid one-use launcher token for `{csrf}` and a cookie. Renewal requires both the existing cookie and `X-CSRF-Token`. The browser retains this proof in origin-scoped session storage and sends it on every private API GET/POST. All POST bodies must be JSON objects. Unexpected action fields are rejected. There is no arbitrary filesystem route. Reloading the authenticated tab works; a new tab without proof needs a fresh launcher.
 
 | Method | Route | Body | Response |
 | --- | --- | --- | --- |
-| GET | `/api/state` | — | Residents, archives, addable bindings, capabilities, room summaries, initial room and `fixture` flag. |
-| GET | `/api/rooms/<id>` | — | Saved room with bounded recent history and artifact versions. |
+| GET | `/api/state` | — | Residents, archives, bindings, capabilities, 100 room summaries/next cursor, initial browser room and `fixture` flag. |
+| GET | `/api/rooms?before=<cursor>` | — | 100 room summaries and `next_room_cursor`. |
+| GET | `/api/rooms/<id>` | — | Saved room with bounded history, round summaries, 100 version metadata records and next cursor. |
+| GET | `/api/rooms/<id>/artifacts?before=<cursor>` | — | 100 version metadata records and `next_artifact_cursor`. |
+| GET | `/api/rooms/<id>/artifacts/<artifact>/versions/<version>` | — | Exact immutable body and authoritative `latest_version`. |
 | POST | `/api/rooms` | `{title}` | New room summary. |
 | POST | `/api/rooms/<id>/rounds` | `{text, participants, request_id, mode, artifact_ids?}` | Saved round. |
 | POST | `/api/rounds/<id>/cancel` | `{}` | Stopped round. |
@@ -238,15 +245,15 @@ For a new artifact, omit both `artifact_id` and `expected_version`. A stale `exp
 
 | Record | Stable fields |
 | --- | --- |
-| State | `agents`, `archived_agents`, `resident_bindings`, `capabilities`, `rooms`, `room`, `fixture`. |
-| Capabilities | `max_residents`, `max_participants`, `max_provider_calls`, `max_workers`, `max_prompt_bytes`. Standard registry limits are 64, 64, 129 and 131072 bytes; worker count reflects configuration. |
+| State | `agents`, `archived_agents`, `resident_bindings`, `capabilities`, `rooms`, `next_room_cursor`, `room`, `fixture`. |
+| Capabilities | `max_residents`, `max_participants`, `max_provider_calls`, `max_workers`, `max_active_rounds`, `max_prompt_bytes`. Standard registry limits are 64, 64, 129 and 131072 bytes; worker/driver counts reflect configuration. |
 | Resident | `id`, `name`, `provider`, `role`, `binding_id`, `home_slot`, `archived`, `available`. |
 | Message | `id`, `role` (`owner`/`agent`/`system`), `agent_id`, `agent_name`, `agent_provider`, `phase`, `content`, `round_id`, `created_at`. Speaker/phase fields may be null. |
 | Round | `id`, `room_id`, `request_id`, `status`, `mode`, `participants`, `participant_snapshots`, `artifacts`, `context_sha256`, `context_bytes`, `owner_message_id`, `max_calls`, `synthesizer`, `note`, timestamps and `turns`. |
-| Turn | `id`, `round_id`, `agent_id`, `phase`, `status`, `launched`, `content`, `error`, `provider`, `session_id`, `model`, timestamps. Provider metadata may be null; native session IDs are private local data. |
-| Artifact version | `id`, `title`, `version`, `content`, `sha256`, `created_at`. |
+| Browser turn | `id`, `round_id`, `agent_id`, `phase`, `status`, `launched`, `error`, `provider`, timestamps. Full trusted Store readback also contains `content`, `session_id` and `model`. |
+| Artifact metadata | `id`, `title`, `version`, `latest_version`, `sha256`, `created_at`. Exact-body lookup additionally contains `content`. |
 
-Room `artifacts` contain one latest object per artifact, with a `versions` array holding every immutable version. [`room.js`](../home/web/room.js) flattens this shape at the editor boundary. Selected artifacts in a round identify the exact frozen versions.
+Browser room `artifacts` are flat version metadata, newest 100 first; `next_artifact_cursor` enables explicit older-page requests. Bodies load on selection/comparison and are cached with a small bound. Attachment eligibility uses authoritative `latest_version`, not the newest version currently loaded in the browser. Trusted `Store.room` still nests every immutable body under the latest artifact's `versions` array; [`room.js`](../home/web/room.js) accepts either shape. Selected artifacts in a round identify exact frozen versions. Browser round snapshots retain name/provider, omitting private roles.
 
 ## 7. Frontend integration rules
 

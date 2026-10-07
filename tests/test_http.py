@@ -6,8 +6,9 @@ import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from http.client import HTTPConnection
+from http.client import HTTPConnection, RemoteDisconnected
 from http.cookies import SimpleCookie
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import urlsplit
@@ -24,6 +25,24 @@ class StubStore:
 
     def list_rooms(self):
         return [{"id": key, "title": value["title"]} for key, value in self.rooms.items()]
+
+    def list_rooms_page(self, before=None):
+        self.calls.append(("list_rooms_page", before))
+        return {"rooms": self.list_rooms(), "next_room_cursor": None}
+
+    def room_for_browser(self, room_id):
+        return self.room(room_id)
+
+    def artifact_page(self, room_id, before=None):
+        self.calls.append(("artifact_page", room_id, before))
+        return {"artifacts": [], "next_artifact_cursor": None}
+
+    def artifact_version(self, room_id, artifact_id, version):
+        self.calls.append(("artifact_version", room_id, artifact_id, version))
+        return {"id": artifact_id, "version": version, "content": "Synthetic draft"}
+
+    def round_for_browser(self, round_id):
+        return {"id": round_id, "status": "queued", "participants": ["claude", "codex"]}
 
     def room(self, room_id):
         self.calls.append(("room", room_id))
@@ -93,8 +112,7 @@ class HTTPBoundaryTests(unittest.TestCase):
         request_headers = dict(headers or {})
         if authenticated:
             request_headers.setdefault("Cookie", self.cookie)
-            if method == "POST":
-                request_headers.setdefault("X-CSRF-Token", self.csrf)
+            request_headers.setdefault("X-CSRF-Token", self.csrf)
         if isinstance(body, (dict, list)):
             body = json.dumps(body).encode("utf-8")
             request_headers.setdefault("Content-Type", "application/json")
@@ -172,13 +190,15 @@ class HTTPBoundaryTests(unittest.TestCase):
         try:
             jar = http.cookiejar.CookieJar()
             browser = build_opener(HTTPCookieProcessor(jar))
+            proofs = {}
             for server in (self.server, second):
                 origin = f"http://127.0.0.1:{server.server_address[1]}"
                 request = Request(origin + "/api/session", headers={
                     "Origin": origin, "X-Home-Launch": server.launch_token})
                 with browser.open(request, timeout=3) as response:
                     self.assertEqual(response.status, 200)
-                    self.assertTrue(json.load(response)["csrf"])
+                    proofs[origin] = json.load(response)["csrf"]
+                    self.assertTrue(proofs[origin])
                     for attribute in ("HttpOnly", "SameSite=Strict", "Path=/"):
                         self.assertIn(attribute, response.headers["Set-Cookie"])
 
@@ -186,7 +206,8 @@ class HTTPBoundaryTests(unittest.TestCase):
             # after the second launch rather than silently replacing the first login.
             for server, fixture in ((self.server, True), (second, False)):
                 origin = f"http://127.0.0.1:{server.server_address[1]}"
-                with browser.open(Request(origin + "/api/state", headers={"Origin": origin}),
+                with browser.open(Request(origin + "/api/state", headers={
+                        "Origin": origin, "X-CSRF-Token": proofs[origin]}),
                                   timeout=3) as response:
                     self.assertEqual(response.status, 200)
                     self.assertEqual(json.load(response)["fixture"], fixture)
@@ -204,6 +225,117 @@ class HTTPBoundaryTests(unittest.TestCase):
         finally:
             second.shutdown()
             second.server_close()
+            worker.join(timeout=2)
+
+    def test_cookie_captured_by_sibling_http_service_cannot_read_or_mutate(self):
+        captured = []
+
+        class SiblingHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                captured.append(self.headers.get("Cookie", ""))
+                self.send_response(200)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *_):
+                return
+
+        sibling = ThreadingHTTPServer(("127.0.0.1", 0), SiblingHandler)
+        worker = threading.Thread(target=sibling.serve_forever,
+                                  kwargs={"poll_interval": 0.05}, daemon=True)
+        worker.start()
+        try:
+            browser = build_opener(HTTPCookieProcessor(http.cookiejar.CookieJar()))
+            with browser.open(Request(self.origin + "/api/session", headers={
+                    "X-Home-Launch": self.launch_token}), timeout=3) as response:
+                csrf = json.load(response)["csrf"]
+            with browser.open(f"http://127.0.0.1:{sibling.server_address[1]}/", timeout=3) as response:
+                response.read()
+            self.assertIn(self.server.cookie_name, captured[0])
+            # The other service can forge Host/Origin but does not receive the
+            # browser's origin-scoped proof in a request to its own port.
+            headers = {"Cookie": captured[0], "Origin": self.origin}
+            for method, path, body, status in (
+                    ("GET", "/api/session", None, 401),
+                    ("GET", "/api/state", None, 403),
+                    ("GET", "/api/rooms/room-1", None, 403),
+                    ("POST", "/api/rooms", {"title": "Unauthorized"}, 403)):
+                with self.subTest(path=path):
+                    actual, _, result = self.request(method, path, body, headers)
+                    self.assertEqual(actual, status)
+                    self.assertNotIn("csrf", result)
+            for path in ("/api/session", "/api/state"):
+                status, _, _ = self.request("GET", path, headers={
+                    **headers, "X-CSRF-Token": csrf})
+                self.assertEqual(status, 200)
+            self.assertFalse(any(call[0] == "create_room" for call in self.store.calls))
+        finally:
+            sibling.shutdown()
+            sibling.server_close()
+            worker.join(timeout=2)
+
+    def test_http_admission_is_bounded_before_headers_and_reuses_slots(self):
+        entered = threading.Event()
+        guard = threading.Lock()
+
+        class BoundedServer(HomeServer):
+            max_request_threads = 2
+            active = 0
+            maximum = 0
+
+            def process_request_thread(self, request, client_address):
+                with guard:
+                    self.active += 1
+                    self.maximum = max(self.maximum, self.active)
+                    if self.active == 2:
+                        entered.set()
+                try:
+                    super().process_request_thread(request, client_address)
+                finally:
+                    with guard:
+                        self.active -= 1
+
+        server = BoundedServer(0, StubStore(), StubCouncil(), fixture=True)
+        worker = threading.Thread(target=server.serve_forever,
+                                  kwargs={"poll_interval": 0.05}, daemon=True)
+        worker.start()
+        sockets = []
+        try:
+            port = server.server_address[1]
+            for _ in range(2):
+                connection = socket.create_connection(("127.0.0.1", port), timeout=3)
+                sockets.append(connection)
+                connection.sendall(b"GET / HTTP/1.1\r\n")
+            self.assertTrue(entered.wait(timeout=2))
+            overflow = HTTPConnection("127.0.0.1", port, timeout=3)
+            try:
+                with self.assertRaises((RemoteDisconnected, ConnectionResetError, ConnectionAbortedError)):
+                    overflow.request("GET", "/")
+                    overflow.getresponse()
+            finally:
+                overflow.close()
+            self.assertEqual(server.maximum, 2)
+            for connection in sockets:
+                connection.sendall(f"Host: 127.0.0.1:{port}\r\n\r\n".encode())
+                while connection.recv(4096):
+                    pass
+                connection.close()
+            sockets.clear()
+            # A completed request must release its slot for ordinary town loads.
+            connection = HTTPConnection("127.0.0.1", port, timeout=3)
+            try:
+                connection.request("GET", "/")
+                response = connection.getresponse()
+                self.assertEqual(response.status, 200)
+                response.read()
+            finally:
+                connection.close()
+            self.assertLessEqual(server.maximum, 2)
+        finally:
+            for connection in sockets:
+                connection.close()
+            server.shutdown()
+            server.server_close()
             worker.join(timeout=2)
 
     def test_bad_host_and_origin_are_rejected_even_with_auth(self):
@@ -246,9 +378,20 @@ class HTTPBoundaryTests(unittest.TestCase):
         )
         for headers, body in cases:
             with self.subTest(headers=headers):
-                status, _, value = self.request("POST", "/api/rooms", body, headers, authenticated=True)
-                self.assertEqual(status, 400)
-                self.assertIn("error", value)
+                try:
+                    status, _, value = self.request("POST", "/api/rooms", body, headers, authenticated=True)
+                except (RemoteDisconnected, ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+                    if len(body) <= 96 * 1024:
+                        raise
+                    # Oversized bodies are rejected before reading. Closing while
+                    # inbound bytes remain can reset the connection on Windows.
+                else:
+                    self.assertEqual(status, 400)
+                    self.assertIn("error", value)
+                self.assertEqual(self.store.calls, [])
+                self.assertEqual(self.council.calls, [])
+                status, _, _ = self.request("GET", "/")
+                self.assertEqual(status, 200)  # early rejection does not stop the server
         self.assertEqual(self.store.calls, [])
 
     def test_invalid_json_and_nonobject_body(self):
@@ -339,6 +482,28 @@ class HTTPBoundaryTests(unittest.TestCase):
                                    ("POST", "/api/unknown", {})):
             status, _, _ = self.request(method, path, body, authenticated=True)
             self.assertEqual(status, 404)
+
+    def test_history_routes_use_bounded_pages_and_validate_cursors(self):
+        self.bootstrap()
+        for path, expected in (
+                ("/api/rooms?before=105", ("list_rooms_page", 105)),
+                ("/api/rooms/room-1/artifacts?before=205", ("artifact_page", "room-1", 205)),
+                ("/api/rooms/room-1/artifacts/draft-1/versions/3", ("artifact_version", "room-1", "draft-1", 3))):
+            with self.subTest(path=path):
+                status, _, _ = self.request("GET", path, authenticated=True)
+                self.assertEqual(status, 200)
+                self.assertEqual(expected, self.store.calls[-1])
+        calls_before = len(self.store.calls)
+        for suffix in ("before=", "before=0", "before=-1", "before=1&before=2", "before=9223372036854775808", "unexpected=1"):
+            for base in ("/api/rooms", "/api/rooms/room-1/artifacts"):
+                with self.subTest(base=base, suffix=suffix):
+                    status, _, _ = self.request("GET", base + "?" + suffix, authenticated=True)
+                    self.assertEqual(status, 400)
+        for version in ("0", "-1", "invalid", "9223372036854775808"):
+            status, _, _ = self.request("GET", "/api/rooms/room-1/artifacts/draft-1/versions/" + version,
+                                        authenticated=True)
+            self.assertEqual(status, 400)
+        self.assertEqual(calls_before, len(self.store.calls))
 
     def test_internal_errors_are_sanitized(self):
         self.bootstrap()

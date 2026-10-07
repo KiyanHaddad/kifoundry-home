@@ -1,16 +1,19 @@
 import { TownWorld } from './world.js';
 import { normalizeRoom, recoveryInfo } from './room.js';
 import { ResidentDirectory } from './resident-directory.js';
+import { readSessionProof, saveSessionProof, requestJSON } from './http.js';
 /** @typedef {{id:string,name:string,provider:string,role?:string}} Agent */
 /** @typedef {{id:string,title:string,version:number,content:string,created_at?:string}} Artifact */
 /** @typedef {{id:string,title:string,messages:Array<object>,rounds:Array<object>,artifacts:Artifact[]}} Room */
 
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const state = {
-  csrf: "", agents: /** @type {Agent[]} */ ([]), archived_agents: [], resident_bindings: [], rooms: [], room: /** @type {Room|null} */ (null),
+  csrf: readSessionProof(), agents: /** @type {Agent[]} */ ([]), archived_agents: [], resident_bindings: [], rooms: [], room: /** @type {Room|null} */ (null),
   capabilities: {max_participants:5,max_residents:64,max_workers:4},
   fixture: false, selected: new Set(), sending: false, resuming: false, saving: false, loading: false, epoch: 0, connected: false,
   poll: 0, registryEpoch: 0, editKey: "", attachedId: "", editDirty: false, discussionKey: "", activityKey: "", activityRoundId: "",
+  roomCursor: null, loadingRooms: false, artifactCursor: null, artifactPages: 0, loadingArtifacts: false,
+  artifactBodies: new Map(), artifactRequests: new Map(), artifactLoadEpoch: 0, loadingArtifact: false, unresolvedArtifact: false,
 };
 const activeStatuses = new Set(["queued", "running"]);
 const statusLabels = { queued: "Waiting their turn", running: "Thinking", completed: "Finished", failed: "Could not reply", cancelled: "Stopped", interrupted: "Interrupted", partial: "Some replies received" };
@@ -50,21 +53,7 @@ function storageWrite(key, value) { try { value === null ? localStorage.removeIt
 function dateLabel(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date); }
 
 async function api(path, body, headers = {}) {
-  const options = { credentials: "same-origin", headers: { "Accept": "application/json", ...headers } };
-  if (body !== undefined) {
-    options.method = "POST";
-    options.headers["Content-Type"] = "application/json";
-    options.headers["X-CSRF-Token"] = state.csrf;
-    options.body = JSON.stringify(body);
-  }
-  let response;
-  try { response = await fetch(path, options); }
-  catch { throw new Error("The connection was lost. Your draft is still here."); }
-  let result;
-  try { result = await response.json(); }
-  catch { throw new Error("The home returned an unreadable response. Your draft is kept."); }
-  if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "That request could not be completed.");
-  return result;
+  return requestJSON(path, {body, csrf: state.csrf, headers});
 }
 
 async function boot() {
@@ -77,10 +66,12 @@ async function boot() {
     if (typeof session.csrf !== "string" || !session.csrf) throw new Error("Reopen this home using the launcher to start a private session.");
     if (launch) history.replaceState(null, "", location.pathname + location.search);
     state.csrf = session.csrf;
+    saveSessionProof(session.csrf);
     const data = await api("/api/state");
     if (!Array.isArray(data.agents) || !Array.isArray(data.rooms) || !data.room) throw new Error("The home has no saved conversation to open.");
     applyResidents(data);
     state.rooms = data.rooms;
+    state.roomCursor = data.next_room_cursor || null;
     state.fixture = data.fixture === true;
     state.connected = true;
     if (!state.selected.size) state.selected = new Set(state.agents.filter(agent => agent.available !== false).slice(0,1).map(agent => agent.id));
@@ -89,7 +80,11 @@ async function boot() {
     $("conversationFootnote").textContent = state.fixture ? "This is a fixture demo. These simulated replies do not verify live providers." : "Each resident speaks for themselves. You decide what happens next.";
     renderHouses(); renderParticipants();
     const lastRoom = storageRead("kifoundry-home:last-room");
-    const room = lastRoom && data.rooms.some((item) => item.id === lastRoom) ? await api("/api/rooms/" + encodeURIComponent(lastRoom)) : data.room;
+    let room = data.room;
+    if (lastRoom && lastRoom !== room.id) {
+      try { room = await api("/api/rooms/" + encodeURIComponent(lastRoom)); }
+      catch (error) { if (error.status !== 404) throw error; }
+    }
     adoptRoom(room, true);
   } catch (error) {
     state.connected = false; updateHouseStates();
@@ -227,7 +222,20 @@ function restoreDraft() {
 }
 function adoptRoom(room, changed = false) {
   room = normalizeRoom(room);
+  if (!changed && state.room?.id === room.id) {
+    const versions = new Map(state.room.artifacts.map(artifact => [artifactKey(artifact), artifact]));
+    for (const artifact of room.artifacts) versions.set(artifactKey(artifact), artifact);
+    room.artifacts = [...versions.values()];
+    if (!state.artifactPages) state.artifactCursor = room.next_artifact_cursor || null;
+  } else {
+    state.artifactCursor = room.next_artifact_cursor || null;
+    state.artifactPages = 0;
+    ++state.artifactLoadEpoch; state.loadingArtifact = false; state.unresolvedArtifact = false;
+    state.artifactBodies.clear();
+  }
+  // Older pages are loaded deliberately; polling only refreshes the bounded newest page.
   state.room = room;
+  if (!state.rooms.some(item => item.id === room.id)) state.rooms.unshift({id:room.id, title:room.title, created_at:room.created_at});
   state.connected = true;
   document.querySelector('.conversation-panel').classList.toggle('has-messages',room.messages.length>0);
   toggle('recoverDraftButton',Boolean(storageRead('kifoundry-home:recovered-work:'+room.id)));
@@ -244,6 +252,20 @@ function renderRooms() {
     if (room.id === state.room?.id) el.setAttribute("aria-current", "page");
     return el;
   }));
+  if (state.roomCursor) {
+    const more = button(state.loadingRooms ? 'Loading…' : 'Older conversations', 'small-button', loadOlderRooms);
+    more.disabled = state.loadingRooms; $('rooms').append(more);
+  }
+}
+async function loadOlderRooms() {
+  if (!state.roomCursor || state.loadingRooms) return;
+  state.loadingRooms = true; renderRooms();
+  try {
+    const page = await api('/api/rooms?before=' + encodeURIComponent(state.roomCursor));
+    for (const room of page.rooms) if (!state.rooms.some(item => item.id === room.id)) state.rooms.push(room);
+    state.roomCursor = page.next_room_cursor;
+  } catch (error) { showError('composerError', error.message); }
+  finally { state.loadingRooms = false; renderRooms(); updateComposer(); }
 }
 async function openRoom(id) {
   if (id === state.room?.id || state.sending || state.resuming || state.saving) return;
@@ -362,6 +384,12 @@ function updateComposer() {
   for (const id of ["newRoomButton", "commonsButton", "everyoneButton", "bringWorkButton", "studioButton"]) $(id).disabled = !state.room || state.loading;
   $("newRoomButton").disabled = !state.room || state.loading || state.saving || state.sending || state.resuming;
   for (const roomButton of $("rooms").querySelectorAll("button")) roomButton.disabled = state.saving || state.sending || state.resuming;
+  $('saveArtifactButton').disabled = state.saving || state.loadingArtifact || state.unresolvedArtifact;
+  $('artifactTitle').disabled = state.loadingArtifact || state.saving;
+  $('artifactContent').disabled = state.loadingArtifact || state.saving;
+  $('artifactSelect').disabled = state.saving;
+  $('newDraftButton').disabled = state.saving;
+  $('recoverDraftButton').disabled = state.saving;
   const artifact = latestArtifact(state.attachedId);
   $("attachedWork").textContent = artifact ? artifact.title + " · v" + artifact.version : "";
   renderRecovery();
@@ -430,8 +458,40 @@ function schedulePoll() {
 }
 
 function artifactKey(artifact) { return artifact.id + ":" + artifact.version; }
-function selectedArtifact() { return state.room?.artifacts.find((artifact) => artifactKey(artifact) === state.editKey) || null; }
-function latestArtifact(id) { return state.room?.artifacts.filter((artifact) => artifact.id === id).sort((a, b) => b.version - a.version)[0] || null; }
+function withBody(artifact) {
+  if (!artifact) return null;
+  const body = state.artifactBodies.get(artifactKey(artifact));
+  return {...artifact, ...body, latest_version: artifact.latest_version ?? body?.latest_version};
+}
+function selectedArtifact() { return withBody(state.room?.artifacts.find((artifact) => artifactKey(artifact) === state.editKey)); }
+function latestArtifact(id) { return withBody(state.room?.artifacts.filter((artifact) => artifact.id === id).sort((a, b) => b.version - a.version)[0]); }
+function cacheArtifact(artifact) {
+  const key = artifactKey(artifact);
+  state.artifactBodies.delete(key); state.artifactBodies.set(key, artifact);
+  // Keep exact selected/comparison bodies, with a small cache for recent choices.
+  for (const candidate of state.artifactBodies.keys()) {
+    if (state.artifactBodies.size <= 8) break;
+    if (candidate !== state.editKey && candidate !== $('compareSelect').value) state.artifactBodies.delete(candidate);
+  }
+}
+async function loadArtifactBody(artifact) {
+  if (typeof artifact?.content === 'string') return artifact;
+  const key = artifactKey(artifact), roomId = state.room.id;
+  const cached = state.artifactBodies.get(key);
+  if (cached) return cached;
+  const requestKey = roomId + ':' + key;
+  let pending = state.artifactRequests.get(requestKey);
+  if (!pending) {
+    pending = api('/api/rooms/' + encodeURIComponent(roomId) + '/artifacts/' + encodeURIComponent(artifact.id) + '/versions/' + artifact.version);
+    state.artifactRequests.set(requestKey, pending);
+  }
+  try {
+    const result = await pending;
+    if (result.id !== artifact.id || result.version !== artifact.version || typeof result.content !== 'string') throw new Error('That saved version could not be loaded.');
+    if (state.room?.id === roomId) cacheArtifact(result);
+    return result;
+  } finally { if (state.artifactRequests.get(requestKey) === pending) state.artifactRequests.delete(requestKey); }
+}
 function openStudio() { state.studioReturn=document.activeElement; toggle("studioPanel", true); $("artifactTitle").focus({ preventScroll: true }); }
 function motionBehavior() { return matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"; }
 function renderArtifacts() {
@@ -441,24 +501,79 @@ function renderArtifacts() {
     const option = node("option", artifact.title + " · v" + artifact.version); option.value = artifactKey(artifact); options.push(option);
   }
   $("artifactSelect").replaceChildren(...options);
-  if (!artifacts.some((artifact) => artifactKey(artifact) === state.editKey)) state.editKey = "";
+  $('olderArtifactsButton').hidden = !state.artifactCursor;
+  $('olderArtifactsButton').disabled = state.loadingArtifacts;
+  $('olderArtifactsButton').textContent = state.loadingArtifacts ? 'Loading…' : 'Older saved versions';
+  $('retryArtifactButton').hidden = !state.unresolvedArtifact;
+  $('retryArtifactButton').disabled = state.loadingArtifact;
+  if (state.editKey && typeof selectedArtifact()?.content !== 'string' && !state.unresolvedArtifact) {
+    restoreSelectedVersion();
+  }
   $("artifactSelect").value = state.editKey;
   const selected = selectedArtifact();
-  if (selected && !state.editDirty) { $("artifactTitle").value = selected.title; $("artifactContent").value = selected.content; }
+  if (selected && !state.editDirty && typeof selected.content === 'string') { $("artifactTitle").value = selected.title; $("artifactContent").value = selected.content; }
   const latest = selected && latestArtifact(selected.id);
-  const isLatest = selected && selected.version === latest.version;
+  const isLatest = selected && selected.version === (selected.latest_version || latest.version);
   $("attachArtifact").disabled = !isLatest;
   $("attachArtifact").checked = Boolean(isLatest && state.attachedId === selected.id);
   $("saveArtifactButton").textContent = selected ? "Save new revision" : "Save draft";
   if (state.attachedId && !latestArtifact(state.attachedId)) state.attachedId = "";
   renderComparison(); updateComposer();
 }
-function selectArtifact(key) {
+async function selectArtifact(key) {
+  if (state.saving) return;
   preserveEditedWork();
-  state.editKey = key; state.editDirty = false; showError("artifactError"); $("artifactNotice").textContent = "";
-  const selected = selectedArtifact();
-  $("artifactTitle").value = selected?.title || ""; $("artifactContent").value = selected?.content || "";
-  renderArtifacts(); persistDraft();
+  const roomId = state.room.id, epoch = ++state.artifactLoadEpoch;
+  state.loadingArtifact = true; showError('artifactError'); updateComposer();
+  try {
+    const metadata = state.room.artifacts.find(artifact => artifactKey(artifact) === key);
+    const selected = key && metadata ? await loadArtifactBody(metadata) : null;
+    if (state.room.id !== roomId || epoch !== state.artifactLoadEpoch) return;
+    state.editKey = selected ? key : ''; state.editDirty = false;
+    state.unresolvedArtifact = false;
+    $('artifactTitle').value = selected?.title || ''; $('artifactContent').value = selected?.content || '';
+    $('artifactNotice').textContent = ''; renderArtifacts(); persistDraft();
+  } catch (error) {
+    if (state.room.id === roomId && epoch === state.artifactLoadEpoch) { showError('artifactError', error.message); renderArtifacts(); }
+  } finally { if (epoch === state.artifactLoadEpoch) { state.loadingArtifact = false; updateComposer(); } }
+}
+async function loadOlderArtifacts() {
+  if (!state.artifactCursor || state.loadingArtifacts || !state.room) return;
+  const roomId = state.room.id;
+  state.loadingArtifacts = true; renderArtifacts();
+  try {
+    const page = await api('/api/rooms/' + encodeURIComponent(roomId) + '/artifacts?before=' + encodeURIComponent(state.artifactCursor));
+    if (state.room.id !== roomId) return;
+    const versions = new Map(state.room.artifacts.map(artifact => [artifactKey(artifact), artifact]));
+    for (const artifact of page.artifacts) versions.set(artifactKey(artifact), artifact);
+    state.room.artifacts = [...versions.values()]; state.artifactCursor = page.next_artifact_cursor;
+    ++state.artifactPages;
+  } catch (error) { if (state.room.id === roomId) showError('artifactError', error.message); }
+  finally { state.loadingArtifacts = false; renderArtifacts(); }
+}
+async function restoreSelectedVersion() {
+  if (state.loadingArtifact || !state.room) return;
+  const [id, versionText] = state.editKey.split(':');
+  const version = Number(versionText);
+  if (!id || !Number.isSafeInteger(version) || version < 1) { state.editKey = ''; return; }
+  const roomId = state.room.id, key = state.editKey, epoch = ++state.artifactLoadEpoch;
+  state.loadingArtifact = true; updateComposer();
+  try {
+    const body = await loadArtifactBody({id, version});
+    if (state.room.id !== roomId || state.editKey !== key || epoch !== state.artifactLoadEpoch) return;
+    const {content, ...metadata} = body;
+    const existing = state.room.artifacts.findIndex(artifact => artifactKey(artifact) === key);
+    if (existing >= 0) state.room.artifacts[existing] = metadata;
+    else state.room.artifacts.push(metadata);
+    state.unresolvedArtifact = false;
+    if (!state.editDirty) { $('artifactTitle').value = body.title; $('artifactContent').value = content; }
+    renderArtifacts();
+  } catch (error) {
+    if (state.room.id === roomId && state.editKey === key && epoch === state.artifactLoadEpoch) {
+      state.unresolvedArtifact = true;
+      showError('artifactError', 'Your edited text is kept. Retry loading its saved version, or choose New draft to save it separately. ' + error.message);
+    }
+  } finally { if (epoch === state.artifactLoadEpoch) { state.loadingArtifact = false; renderArtifacts(); updateComposer(); } }
 }
 function recoveryKey() { return 'kifoundry-home:recovered-work:'+state.room.id; }
 function preserveEditedWork() {
@@ -467,8 +582,10 @@ function preserveEditedWork() {
   toggle('recoverDraftButton',true);
 }
 function recoverEditedWork() {
+  if (state.saving) return;
   let draft;try{draft=JSON.parse(storageRead(recoveryKey())||'null');}catch{return;}
   if(!draft || typeof draft.content!=='string')return;
+  ++state.artifactLoadEpoch; state.loadingArtifact = false;
   const current={editKey:state.editKey,title:$("artifactTitle").value,content:$("artifactContent").value};
   state.editKey=typeof draft.editKey==='string'?draft.editKey:'';state.editDirty=true;
   $("artifactTitle").value=typeof draft.title==='string'?draft.title:'';$("artifactContent").value=draft.content;
@@ -477,12 +594,15 @@ function recoverEditedWork() {
   renderArtifacts();persistDraft();$("artifactNotice").textContent='Unsaved edits recovered. Review before saving.';
 }
 function useMessageAsDraft(content) {
+  if (state.saving) { showError('artifactError', 'Wait for the current draft to finish saving.'); return; }
+  ++state.artifactLoadEpoch; state.loadingArtifact = false; preserveEditedWork();
+  updateComposer();
   openStudio(); $("artifactContent").value = content;
   if (!$("artifactTitle").value) $("artifactTitle").value = "Conversation draft";
   state.editDirty = true; $("artifactNotice").textContent = "Reply placed on the desk. Review it, then save a draft or revision.";
   persistDraft(); $("artifactContent").focus({ preventScroll: true });
 }
-function renderComparison() {
+async function renderComparison() {
   const selected = selectedArtifact();
   const versions = selected ? state.room.artifacts.filter((artifact) => artifact.id === selected.id && artifact.version !== selected.version).sort((a, b) => a.version - b.version) : [];
   toggle("comparison", Boolean(selected && versions.length));
@@ -493,24 +613,45 @@ function renderComparison() {
   const original = versions.find((artifact) => artifactKey(artifact) === $("compareSelect").value) || versions[0];
   $("originalLabel").textContent = original.title + " · v" + original.version;
   $("revisionLabel").textContent = selected.title + " · v" + selected.version;
-  $("originalContent").textContent = original.content; $("revisionContent").textContent = selected.content;
+  const roomId = state.room.id, selectedKey = artifactKey(selected), originalKey = artifactKey(original);
+  $('originalContent').textContent = 'Loading saved version…';
+  $('revisionContent').textContent = selected.content || 'Choose this saved version to load its contents.';
+  try {
+    const loaded = await loadArtifactBody(original);
+    if (state.room.id === roomId && state.editKey === selectedKey && $('compareSelect').value === originalKey) $('originalContent').textContent = loaded.content;
+  } catch (error) {
+    if (state.room.id === roomId && state.editKey === selectedKey && $('compareSelect').value === originalKey) {
+      $('originalContent').textContent = 'Saved version could not be loaded.'; showError('artifactError', error.message);
+    }
+  }
 }
 async function saveArtifact(event) {
-  event.preventDefault(); if (!state.room || state.saving) return;
+  event.preventDefault(); if (!state.room || state.saving || state.loadingArtifact || state.unresolvedArtifact) return;
   const title = $("artifactTitle").value.trim(), content = $("artifactContent").value;
   if (!title || !content.trim()) return;
   if (new TextEncoder().encode(content).length > 65536) { showError("artifactError", "This draft exceeds 64 KiB. Save a smaller section."); return; }
   const selected = selectedArtifact();
   const payload = { title, content };
   if (selected) { payload.artifact_id = selected.id; payload.expected_version = selected.version; }
+  const roomId = state.room.id;
+  let saved = false;
   state.saving = true; $("saveArtifactButton").disabled = true; showError("artifactError"); updateComposer();
   try {
-    const artifact = await api("/api/rooms/" + encodeURIComponent(state.room.id) + "/artifacts", payload);
-    const room = await api("/api/rooms/" + encodeURIComponent(state.room.id));
+    const artifact = await api("/api/rooms/" + encodeURIComponent(roomId) + "/artifacts", payload);
+    saved = true;
+    if (state.room.id !== roomId) return;
+    // A confirmed save is durable even if the following room refresh fails.
+    // Adopt its identity now so another Save cannot create a duplicate draft.
+    cacheArtifact(artifact);
+    const {content: savedContent, ...metadata} = artifact;
+    const versions = state.room.artifacts.filter(item => artifactKey(item) !== artifactKey(artifact));
+    state.room.artifacts = [...versions.map(item => item.id === artifact.id ? {...item, latest_version: artifact.version} : item), {...metadata, latest_version: artifact.version}];
     state.editKey = artifactKey(artifact); state.editDirty = false; state.attachedId = artifact.id;
-    adoptRoom(room); persistDraft();
+    renderArtifacts(); persistDraft();
     $("artifactNotice").textContent = "Version " + artifact.version + " saved. It will be included in your next message.";
-  } catch (error) { showError("artifactError", error.message + " Your edited draft is kept; existing versions have not been overwritten."); }
+    const room = await api("/api/rooms/" + encodeURIComponent(roomId));
+    if (state.room.id === roomId) adoptRoom(room);
+  } catch (error) { showError("artifactError", saved ? "Your version was saved, but the conversation could not be refreshed. Reconnect to load its latest progress." : error.message + " Your edited draft is kept. Check saved versions before retrying; existing versions have not been overwritten."); }
   finally { state.saving = false; $("saveArtifactButton").disabled = false; updateComposer(); if (document.activeElement === document.body) $('saveArtifactButton').focus({preventScroll:true}); }
 }
 async function createRoom(event) {
@@ -544,6 +685,8 @@ $('resumeButton').addEventListener('click', resumeRound);
 $('recoverySelect').addEventListener('change', () => { state.activityRoundId = $('recoverySelect').value; state.activityKey = ''; renderActivity(); renderRecovery(); });
 $("retryButton").addEventListener("click", boot);
 $("artifactSelect").addEventListener("change", () => selectArtifact($("artifactSelect").value));
+$('olderArtifactsButton').addEventListener('click', loadOlderArtifacts);
+$('retryArtifactButton').addEventListener('click', restoreSelectedVersion);
 $("newDraftButton").addEventListener("click", () => selectArtifact(""));
 $("recoverDraftButton").addEventListener("click", recoverEditedWork);
 $("artifactForm").addEventListener("submit", saveArtifact);

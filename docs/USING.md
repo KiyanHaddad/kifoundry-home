@@ -34,6 +34,8 @@ Earlier contributions can be expanded in the discussion. Council is bounded; it 
 
 Saving appends a version; it does not replace earlier saved text. Moving a reply onto the desk does not save it automatically. The interface supports pasted text, not general video/audio inspection or arbitrary file upload.
 
+The studio initially lists 100 recent version records. Use **Older saved versions** to load another page; selecting a version or comparison loads that exact body. An older revision cannot be attached as the current draft. Conversation lists likewise offer **Older conversations**. All records remain saved.
+
 Try `examples/script.txt` for a first exercise: save it, ask a small Council to improve its opening, then compare the revision with the original.
 
 ## Stop and recover

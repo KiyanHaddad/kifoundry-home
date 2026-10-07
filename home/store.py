@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 import sys
 import threading
@@ -53,13 +54,15 @@ from .models import (
     utf8_len,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 ROUND_STATES = ("queued", "running", "completed", "failed", "cancelled", "interrupted")
 ACTIVE_STATES = ("queued", "running")
 PHASES = ("reply", "proposal", "critique", "synthesis")
 HISTORY_LIMIT = 200
 ROOM_ROUND_LIMIT = 50
+ARTIFACT_PAGE_LIMIT = 100
+ROOM_PAGE_LIMIT = 100
 
 _STATES_SQL = ",".join(f"'{s}'" for s in ROUND_STATES)
 _PHASES_SQL = ",".join(f"'{p}'" for p in PHASES)
@@ -161,6 +164,10 @@ ALTER TABLE rounds ADD COLUMN participant_snapshots TEXT NOT NULL DEFAULT '{{}}'
 ALTER TABLE messages ADD COLUMN agent_name TEXT;
 ALTER TABLE messages ADD COLUMN agent_provider TEXT;
 """,
+    3: """
+CREATE INDEX rounds_by_room ON rounds(room_id, seq);
+CREATE INDEX artifacts_by_room ON artifacts(room_id, created_at, id);
+""",
 }
 
 ContextBuilder = Callable[[list[dict[str, Any]], int, list[dict[str, Any]], str], str]
@@ -214,11 +221,12 @@ def _check_title(title: Any, what: str) -> str:
 class Store:
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         self._guard = threading.RLock()
         self._lock_files = ExitStack()
         self._lock_handle: BinaryIO | None = self._lock_files.enter_context(
-            self.path.with_name(self.path.name + ".lock").open("a+b"))
+            os.fdopen(os.open(self.path.with_name(self.path.name + ".lock"),
+                              os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o600), "a+b"))
         try:
             _lock_file(self._lock_handle)
         except OSError:
@@ -226,6 +234,14 @@ class Store:
             self._lock_handle = None
             raise StoreLockedError("Another KiFoundry Home server is already using this data root")
         try:
+            # Reserve a new database with owner-only POSIX permissions before SQLite
+            # opens it. Existing roots/files keep their permissions and contents.
+            try:
+                descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            except FileExistsError:
+                pass
+            else:
+                os.close(descriptor)
             self._db = sqlite3.connect(
                 str(self.path), isolation_level=None, check_same_thread=False, timeout=10
             )
@@ -310,7 +326,31 @@ class Store:
         )
         return [dict(row) for row in rows]
 
+    def list_rooms_page(self, before: int | None = None) -> dict[str, Any]:
+        """Bounded browser list. The full integration list remains available separately."""
+        if before is not None and (type(before) is not int or not 1 <= before <= 2**63 - 1):
+            raise ValidationError("Invalid conversation history cursor")
+        rows = self._read(
+            "SELECT r.rowid AS cursor, r.id, r.title, r.created_at, "
+            "(SELECT id FROM rounds WHERE active_room = r.id) AS active_round_id FROM rooms r " +
+            ("WHERE r.rowid < ? " if before is not None else "") +
+            "ORDER BY r.rowid DESC LIMIT ?",
+            (before, ROOM_PAGE_LIMIT + 1) if before is not None else (ROOM_PAGE_LIMIT + 1,),
+        )
+        page = rows[:ROOM_PAGE_LIMIT]
+        return {"rooms": [{key: row[key] for key in ("id", "title", "created_at", "active_round_id")}
+                          for row in page],
+                "next_room_cursor": str(page[-1]["cursor"]) if len(rows) > ROOM_PAGE_LIMIT else None}
+
     def room(self, room_id: str, message_limit: int = HISTORY_LIMIT) -> dict[str, Any]:
+        """Trusted full readback, including immutable artifact bodies."""
+        return self._room(room_id, message_limit, for_browser=False)
+
+    def room_for_browser(self, room_id: str) -> dict[str, Any]:
+        """Bounded history and version metadata; draft bodies are fetched on selection."""
+        return self._room(room_id, HISTORY_LIMIT, for_browser=True)
+
+    def _room(self, room_id: str, message_limit: int, *, for_browser: bool) -> dict[str, Any]:
         with self._guard:
             row = self._db.execute("SELECT id, title, created_at FROM rooms WHERE id = ?", (room_id,)).fetchone()
             if row is None:
@@ -328,8 +368,8 @@ class Store:
                 **dict(row),
                 "messages": [self._message_dict(m) for m in messages],
                 "earlier_messages": max(0, total - len(messages)),
-                "rounds": [self._round_dict(self._db, r["id"]) for r in round_ids],
-                "artifacts": self._artifacts(self._db, room_id),
+                "rounds": [self._round_dict(self._db, r["id"], for_browser=for_browser) for r in round_ids],
+                **(self.artifact_page(room_id) if for_browser else {"artifacts": self._artifacts(self._db, room_id)}),
             }
 
     @staticmethod
@@ -374,6 +414,43 @@ class Store:
             grouped.setdefault(row["artifact_id"], []).append(self._version_dict(row))
         # Latest version fields at the top level, every immutable version for comparison.
         return [{**versions[-1], "versions": versions} for versions in grouped.values()]
+
+    def artifact_page(self, room_id: str, before: int | None = None) -> dict[str, Any]:
+        """Latest version metadata, ordered by insertion, without reading draft bodies."""
+        if before is not None and (type(before) is not int or not 1 <= before <= 2**63 - 1):
+            raise ValidationError("Invalid artifact history cursor")
+        with self._guard:
+            self._require_room(self._db, room_id)
+            rows = self._db.execute(
+                "SELECT v.rowid AS cursor, v.artifact_id, v.title, v.version, v.sha256, v.created_at, "
+                "(SELECT max(newest.version) FROM artifact_versions newest WHERE newest.artifact_id = v.artifact_id) AS latest_version "
+                "FROM artifact_versions v JOIN artifacts a ON a.id = v.artifact_id "
+                "WHERE a.room_id = ? " + ("AND v.rowid < ? " if before is not None else "") +
+                "ORDER BY v.rowid DESC LIMIT ?",
+                (room_id, before, ARTIFACT_PAGE_LIMIT + 1) if before is not None else
+                (room_id, ARTIFACT_PAGE_LIMIT + 1),
+            ).fetchall()
+            page = rows[:ARTIFACT_PAGE_LIMIT]
+            return {
+                "artifacts": [{"id": row["artifact_id"], **{key: row[key] for key in
+                              ("title", "version", "sha256", "created_at", "latest_version")}} for row in page],
+                "next_artifact_cursor": str(page[-1]["cursor"]) if len(rows) > ARTIFACT_PAGE_LIMIT else None,
+            }
+
+    def artifact_version(self, room_id: str, artifact_id: str, version: int) -> dict[str, Any]:
+        """One exact immutable body, only within its owning room."""
+        if type(version) is not int or not 1 <= version <= 2**63 - 1:
+            raise ValidationError("Invalid artifact version")
+        rows = self._read(
+            "SELECT v.*, (SELECT max(newest.version) FROM artifact_versions newest "
+            "WHERE newest.artifact_id = v.artifact_id) AS latest_version "
+            "FROM artifact_versions v JOIN artifacts a ON a.id = v.artifact_id "
+            "WHERE a.room_id = ? AND v.artifact_id = ? AND v.version = ?",
+            (room_id, artifact_id, version),
+        )
+        if not rows:
+            raise NotFoundError("Artifact version not found in this room")
+        return {**self._version_dict(rows[0]), "latest_version": rows[0]["latest_version"]}
 
     def save_artifact(self, room_id: str, title: str, content: str,
                       artifact_id: str | None = None, expected_version: int | None = None) -> dict[str, Any]:
@@ -485,20 +562,35 @@ class Store:
                 self._insert_turn(db, round_id, agent_id, first_phase)
             return self._round_dict(db, round_id), True
 
-    def _round_dict(self, db: sqlite3.Connection, round_id: str) -> dict[str, Any]:
-        row = db.execute("SELECT * FROM rounds WHERE id = ?", (round_id,)).fetchone()
+    def _round_dict(self, db: sqlite3.Connection, round_id: str, *, for_browser: bool = False) -> dict[str, Any]:
+        fields = ("id, room_id, request_id, status, mode, participants, participant_snapshots, artifacts, "
+                  "context_sha256, length(CAST(context AS BLOB)) AS context_bytes, owner_message_id, "
+                  "note, created_at, updated_at") if for_browser else "*"
+        row = db.execute(f"SELECT {fields} FROM rounds WHERE id = ?", (round_id,)).fetchone()
         if row is None:
             raise NotFoundError("Round not found")
         participants = json.loads(row["participants"])
-        turns = [self._turn_dict(t) for t in
-                 db.execute("SELECT * FROM turns WHERE round_id = ? ORDER BY seq", (round_id,)).fetchall()]
+        if for_browser:
+            turn_rows = db.execute(
+                "SELECT id, round_id, agent_id, phase, status, launched, error, provider, created_at, updated_at "
+                "FROM turns WHERE round_id = ? ORDER BY seq", (round_id,),
+            ).fetchall()
+            turns = [{**dict(turn), "launched": bool(turn["launched"])} for turn in turn_rows]
+        else:
+            turns = [self._turn_dict(t) for t in
+                     db.execute("SELECT * FROM turns WHERE round_id = ? ORDER BY seq", (round_id,)).fetchall()]
         synthesis = [t["agent_id"] for t in turns if t["phase"] == "synthesis"]
+        snapshots = json.loads(row["participant_snapshots"])
+        if for_browser:
+            snapshots = {key: {field: value.get(field, "") for field in ("name", "provider")}
+                         for key, value in snapshots.items()}
         return {
             "id": row["id"], "room_id": row["room_id"], "request_id": row["request_id"],
             "status": row["status"], "mode": row["mode"], "participants": participants,
-            "participant_snapshots": json.loads(row["participant_snapshots"]),
+            "participant_snapshots": snapshots,
             "artifacts": json.loads(row["artifacts"]), "context_sha256": row["context_sha256"],
-            "context_bytes": utf8_len(row["context"]), "owner_message_id": row["owner_message_id"],
+            "context_bytes": row["context_bytes"] if for_browser else utf8_len(row["context"]),
+            "owner_message_id": row["owner_message_id"],
             "max_calls": 1 if row["mode"] == "direct" else 2 * len(participants) + 1,
             "synthesizer": synthesis[0] if synthesis else None, "note": row["note"],
             "created_at": row["created_at"], "updated_at": row["updated_at"], "turns": turns,
@@ -507,6 +599,10 @@ class Store:
     def round(self, round_id: str) -> dict[str, Any]:
         with self._guard:
             return self._round_dict(self._db, round_id)
+
+    def round_for_browser(self, round_id: str) -> dict[str, Any]:
+        with self._guard:
+            return self._round_dict(self._db, round_id, for_browser=True)
 
     def round_for_request(self, request_id: str, request_sha256: str) -> dict[str, Any] | None:
         """The round already saved under request_id, or None. A different payload is refused."""

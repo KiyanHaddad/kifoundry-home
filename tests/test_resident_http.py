@@ -60,8 +60,7 @@ class ResidentHTTP(unittest.TestCase):
         if auth:
             request_headers.setdefault("Cookie", self.cookie)
             request_headers.setdefault("Origin", self.origin)
-            if method == "POST":
-                request_headers.setdefault("X-CSRF-Token", self.csrf)
+            request_headers.setdefault("X-CSRF-Token", self.csrf)
         if isinstance(body, dict):
             body = json.dumps(body).encode("utf-8")
             request_headers.setdefault("Content-Type", "application/json")
@@ -104,10 +103,27 @@ class ResidentHTTP(unittest.TestCase):
             self.assertEqual(set(agent), {"id", "name", "provider", "role", "binding_id", "home_slot",
                                           "archived", "available"})
 
+    def test_http_draft_history_is_metadata_only_and_exact_body_requires_owned_room(self):
+        first = self.store.save_artifact(self.room, "Original", "Synthetic original text")
+        self.store.save_artifact(self.room, "Revision", "Synthetic revised text", first["id"], 1)
+        status, _, room = self.request("GET", f"/api/rooms/{self.room}", auth=True)
+        self.assertEqual(status, 200)
+        self.assertEqual([2, 1], [item["version"] for item in room["artifacts"]])
+        self.assertTrue(all("content" not in item for item in room["artifacts"]))
+        status, _, exact = self.request("GET", f"/api/rooms/{self.room}/artifacts/{first['id']}/versions/1", auth=True)
+        self.assertEqual((status, exact["content"], exact["sha256"]),
+                         (200, first["content"], first["sha256"]))
+        other = self.store.create_room("Other synthetic room")["id"]
+        status, _, body = self.request("GET", f"/api/rooms/{other}/artifacts/{first['id']}/versions/1", auth=True)
+        self.assertEqual(status, 404)
+        self.assertNotIn(first["content"], json.dumps(body))
+        status, _, _ = self.request("GET", f"/api/rooms/{self.room}/artifacts/{first['id']}/versions/1")
+        self.assertEqual(status, 401)
+
     def test_state_capabilities_match_enforced_limits(self):
         self.assertEqual(self.state()["capabilities"],
                          {"max_residents": 64, "max_participants": 64, "max_provider_calls": 129,
-                          "max_workers": 4, "max_prompt_bytes": 131072})
+                          "max_workers": 4, "max_active_rounds": 8, "max_prompt_bytes": 131072})
         status, _, _ = self.request("GET", "/api/state")  # still behind the session cookie
         self.assertEqual(status, 401)
         status, _, _ = self.request("GET", "/api/state", auth=True, headers={"Origin": "http://evil.test"})

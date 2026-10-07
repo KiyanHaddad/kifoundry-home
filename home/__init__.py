@@ -1,3 +1,3 @@
 """KiFoundry Home: conversations, a shared Council and a persistent world."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

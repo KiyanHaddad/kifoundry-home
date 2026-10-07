@@ -2,11 +2,19 @@
 
 This is a local development alpha. These checks establish specific behavior. User acceptance, repository publication and remote CI have separate evidence.
 
+## Security and growth follow-up: version 0.1.1
+
+An independent review covered the then-public 71 files, 90 unique historical blobs across three commits, all five images and all three public CI logs. No sensitive data was found in that bounded review. The repaired scanner additionally checks reachable commit trees/metadata, literal credential assignments, shallow-history rejection, unreadable-directory failures and finite inspection limits; its suite now contains 16 tests.
+
+Controlled regressions reproduced and fixed cross-port cookie authorization, unbounded HTTP/round admission, provider-alias worker starvation and full draft-history polling. A synthetic 500-version history previously returned about 33 MB and used about 99 MB peak Python memory; the browser metadata projection returned about 22 KB and used about 177 KB, with all versions retrievable. This is one local benchmark, not a capacity guarantee.
+
+The expanded source suite ran 154 tests successfully on Windows, with one explicit skip for a POSIX permission check. Ruff, mypy for Windows/Linux targets and all six browser-module syntax checks passed. Browser fixture checks confirmed authenticated reload, room/version pagination, exact revision loading/comparison, saving a new immutable revision, restoring an older off-page selection, and disabling attachment for that old version. Controlled browser-function regressions also cover a confirmed save followed by failed readback and recovery during a pending save. Native providers were not invoked for this security follow-up; earlier native evidence below remains dated to its original runtime.
+
 ## Documentation and privacy follow-up
 
 The published baseline was independently rescanned across all 63 files and 69 unique blobs in its two-commit history. The review covered known credential/private-path patterns, private transcript/session comparisons, asset metadata, exact remote-tree identity and GitHub security settings; no material privacy finding was detected. Public GitHub ownership and noreply attribution remain intentionally visible.
 
-The publication scanner now reads actual Git index or committed HEAD blobs and rejects sensitive tracked paths even when force-added. Seven repository-tooling regressions cover ignored sensitive files, staged/committed values hidden by clean working copies, links, private-data shapes, no-Git downloads and legitimate relative module links. The expanded source suite passed 122 tests locally. This is separate from the earlier 115-test installed-wheel evidence below; application runtime bytes are unchanged.
+At that revision, the publication scanner began reading actual Git index or committed HEAD blobs and rejecting sensitive tracked paths even when force-added. Seven repository-tooling regressions covered ignored sensitive files, staged/committed values hidden by clean working copies, links, private-data shapes, no-Git downloads and legitimate relative module links. The source suite passed 122 tests locally. That documentation update retained the earlier verified runtime; version 0.1.1 changes runtime behavior as described above.
 
 The README screenshot is an actual fresh, offline two-resident fixture town. A browser greeting completed with an explicitly labelled fixture reply. Setup and user instructions were checked against the CLI, configuration and interface, and local documentation links were reviewed. These checks do not establish newcomer usability acceptance or native-session migration.
 
