@@ -100,7 +100,7 @@ async function boot() {
 }
 
 function renderHouses() {
-  world.configure(state.agents);
+  world.configure(state.agents, state.archived_agents);
   updateHouseStates();
 }
 function applyResidents(data) {
@@ -144,8 +144,6 @@ async function mutateResident(path,payload) {
     showError('composerError','Resident change saved. Reconnect to load the latest town.');
   }
   renderHouses(); renderParticipants(); updateComposer(); renderDirectory();
-  const id = changed.id || changed.agent?.id;
-  if (id && state.agents.some(agent => agent.id === id)) world.focusResident(id);
 }
 async function refreshResidents() {
   if(!state.csrf) return;

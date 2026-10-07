@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3 — 2026-10-06
+
+- Replace the repeated five-house scene with a continuous map of eight-home neighborhoods, connected roads, stable plots, vacant gardens and reusable painterly scenery.
+- Add native map scrolling, mouse dragging, keyboard pan/zoom, an overview and direct neighborhood navigation. Registry changes preserve the camera; selecting a distant resident brings their meeting place into view.
+- Keep all 64 homes and residents in the world. Limit simultaneous decorative movement to eight, respect reduced motion and restore resizing/motion after browser Back.
+- Add layout, camera and lifecycle regressions for growth, removal, retained vacant neighborhoods, sparse populations, focus and animation cleanup. Document the existing 64-resident capacity separately from visual expansion.
+
 ## 0.1.2 — 2026-10-06
 
 - Add a working desk above the town: current conversation, most recently saved draft and actual execution status, with direct actions to continue.

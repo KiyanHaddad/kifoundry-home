@@ -23,12 +23,14 @@ REVIEWED_ASSETS = {
     "home/web/residents.webp": {"4a4573411ccc3c0e1b879fda18140acfea449edb1a7aa575f6f88b7c8d8fbe71"},
     "home/web/town-terrain.webp": {"b3801a4e82066b909ff83fdd744303b288dca96836482b37f8a0783105251afe"},
     "home/web/houses.webp": {"eb777b71fef42c478e49276ce456151e1e07b504883088a956afa9975ab11742"},
+    "home/web/town-props.webp": {"5db01f5d76f1c8d00c59285ec9faf3017afd80d28bd5244b9e695b22e95ba84e"},
     "home/web/fraunces-500.ttf": {"0c2fad18ed36cc400041f1e281ee79954a329b345caffc38dfaa3bb8bcef57de"},
     "home/web/manrope-400.ttf": {"a13d9b41b0a471ce58f0e46d377fa3cc76615e4632c3b15eb397caadf7a13f0a"},
     "home/web/manrope-600.ttf": {"6bad1a774228464cc88b8b0271555b266f7a3c64a7bedf15e165fdab4f6ac0ce"},
     "docs/images/town-demo.jpg": {
         "ed36ca3b0191b949d96a2cb7285d498b44853efcfa360b51e1843664b67432d6",
         "b799ed93f3d0426cfd52f94ee6f8596a5f68843e000d643ac06df95c9027f20c",
+        "6638d376620db0bb420c333f397d5acc67375c3ee18b24ce36a35f1c690dcd64",
     },
 }
 PATTERNS = {

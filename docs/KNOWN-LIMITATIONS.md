@@ -8,6 +8,8 @@ This development alpha is progressing toward the full shared-home journey. Hands
 - Download is source code; no desktop installer or guided provider setup is shipped. Binding availability does not establish native sign-in or quota.
 - Demo and native modes share the default data folder. Use the separate explicit paths in [getting started](QUICKSTART.md).
 - Commons currently selects all available residents. Review the guest list and call bound before Send.
+- The continuous map uses eight-home neighborhoods and supports the current limit of 64 active residents. This is a bounded town, not an unlimited population or a verified 64-provider workload. Empty neighborhoods remain connected after residents move out; an occupied former plot requires another free plot before restoring its resident.
+- Houses and characters use five fixed art variants. Characters move with a stride effect; there are no separate facing-direction animation frames, collision simulation or autonomous learning/social behavior. At most eight decorative movements animate together. Distant overview replaces individual homes and people with neighborhood markers.
 - There is no conversation/draft export interface or complete cross-device native-session migration. Database backups preserve saved records; provider sessions require their own continuity.
 
 - Native Claude/Codex Council, a three-resident Council including a Claude-backed specialist, and exact direct-session continuation passed on Windows; see [verification](VERIFICATION.md). Actual 64-provider scale and synthesis quality with short excerpts remain unverified.

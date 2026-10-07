@@ -2,6 +2,16 @@
 
 This is a local development alpha. These checks establish specific behavior. User acceptance, repository publication and remote CI have separate evidence.
 
+## Continuous town follow-up: version 0.1.3
+
+An isolated browser fixture rendered 64 homes and residents across eight connected neighborhoods. Actual directory actions archived a resident, reused the vacated plot, rejected restoration while full, and restored the original identity after a plot was freed. The other homes kept their coordinates. Registry mutations retained the current camera; a 60-character name remained bounded by its sign. Selecting a distant resident brought their commons destination into view. These checks launched no native providers.
+
+Desktop and 390-pixel phone views covered neighborhood navigation, overview, zoom and keyboard focus. The phone page had no horizontal overflow; overview markers stayed separate and actor targets measured approximately 44 screen pixels. Native swipe and browser magnification remain available. The painterly prop atlas was reviewed visually and for metadata, with lossless conversion and public prompt provenance recorded in ASSETS.md. Scenery, homes, characters and controls remain separate layers.
+
+Controlled regressions cover populations of 0, 1, 5, 16 and 64, stable slots and identity appearances, retained vacant neighborhoods, sparse initial populations, native scroll, pointer drag, focus, camera bounds, bounded animation, reduced motion, hidden-page cleanup and browser Back restoration. The current capacity remains 64 active residents; these checks do not establish infinite growth, collision-aware navigation, directional character animation or native-provider performance at that capacity.
+
+The source suite discovered 214 tests and completed with one POSIX-only check skipped on Windows. Ruff, mypy, compilation and all nine browser-module syntax checks passed. The new source and wheel distributions were built and checked against their source files. Privacy scanners and independent source/artwork review covered this outgoing update. Hosted CI is recorded separately in GitHub Actions.
+
 ## Working desk follow-up: version 0.1.2
 
 An isolated browser fixture check covered exact saved-revision opening, saving a new revision, reloading with an unsent message and unsaved editor text, keyboard continuation, execution-detail navigation, and switching to a new conversation. Simulated connection loss and reconnection preserved both drafts and the open conversation. No native providers were invoked.

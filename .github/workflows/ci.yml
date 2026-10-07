@@ -26,6 +26,8 @@ jobs:
       - run: node --check home/web/http.js
       - run: node --check home/web/world.js
       - run: node --check home/web/world-layout.js
+      - run: node --check home/web/world-camera.js
+      - run: node --check home/web/world-terrain.js
       - run: node --check home/web/resident-directory.js
       - run: node --check home/web/room.js
       - run: node --check home/web/working-desk.js

@@ -12,6 +12,17 @@ The town gives you three entrances: a resident's house for a conversation, the c
 
 These actions do not send a message, resume a round or attach a draft. Activity reflects the conversation's last loaded execution state; walking remains decorative. Demo replies stay labelled as simulated.
 
+## Explore the town
+
+Homes occupy stable plots in connected neighborhoods of eight. New residents fill available plots without moving other active homes. The town currently supports 64 active residents.
+
+- Drag the map with a mouse, or swipe on a phone. Use **+** and **−** to zoom.
+- Choose a neighborhood under **Visit** to move there directly. **Commons** returns to the center; **Overview** shows the town with neighborhood names and resident counts. Choose a marker to visit it.
+- Open **Residents** to search names and choose **Talk**. You can use the directory at any map size.
+- With the map focused, arrow keys move it, **+** and **−** zoom, **Home** visits the commons and **End** opens the overview. Tabbing to an offscreen home or resident brings it into view.
+
+Use **Pause wandering** for a still town. The operating system's reduced-motion preference also stops decorative movement. At most eight movements animate together; the other residents remain represented. Walking does not send messages or establish that an agent is working.
+
 ## Talk to one resident
 
 1. Choose their house, or open **Residents → Talk**.
@@ -58,9 +69,9 @@ For a stopped or interrupted round, **Continue saved work** shows its original p
 
 Open **Residents → Add resident**, enter a name and role, and choose an existing provider connection. That connection must already be configured locally. A Claude-backed specialist remains labelled Claude; adding a name does not create a new provider account.
 
-- **Move out** archives a resident and keeps their history.
-- **Bring back** restores the same identity when a connection and home slot are available.
-- Other active homes keep their locations. The directory and neighborhoods support up to 64 active residents.
+- **Move out** archives a resident and keeps their history and sessions. Their released plot becomes a garden until another resident uses it. The neighborhood remains part of the town.
+- **Bring back** restores the same identity when a connection and home slot are available. They return to their former plot if it is free; otherwise they use the first free plot.
+- Other active homes keep their locations. Refreshing the roster preserves your map view; choosing a resident or destination can center it there. The directory and neighborhoods support up to 64 active residents.
 
 Resident changes wait for active work to finish, including processes still exiting after Stop.
 

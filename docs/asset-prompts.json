@@ -105,7 +105,226 @@
         "Solid cottage feet are between 77.6% and 79.8% of image height, rather than the requested exact 85% baseline.",
         "Very low alpha residual pixels and fine cutout fringes remain within some cells; nominal cell boundary columns are alpha zero."
       ]
+    },
+    {
+      "path": "home/web/town-props.webp",
+      "tool": "Codex built-in image generation",
+      "style_reference_assets": [
+        "home/web/houses.webp",
+        "home/web/town-terrain.webp"
+      ],
+      "operation": "Original reusable props atlas followed by two image-generation layout corrections.",
+      "prompt": "Recompose the supplied eight fantasy RPG cutout props as a professionally padded sprite atlas. Keep all eight designs and their original detailed painterly appearance. Change placement and scale only.\nIMPORTANT CORRECTION: the first row is too low and objects are too large. MOVE EVERY TOP-ROW PROP UPWARD BY ABOUT150PIXELS. REDUCE EVERY PROP TO ABOUT60PERCENT OF ITS CURRENT WIDTH AND HEIGHT. This intentionally creates very generous transparent empty space. The sprite art should occupy a small central portion of each cell, never approach an edge. Leave enormous empty transparent gutters, especially across the entire horizontal middle of the canvas. Do not fill the empty space.\nUse FOUR equal columns and TWO equal rows. Imagine each cell as a transparent box. CENTER THE COMPLETE PROP'S BOUNDING BOX BOTH HORIZONTALLY AND VERTICALLY WITHIN ITS OWN BOX. Do NOT align tops, bottoms or ground baselines between differently sized props in this revision; center each complete silhouette in its own cell. Each prop must fit inside the central60PERCENT of its cell width and central70PERCENT of its cell height. No leaves, chair legs, rocks, glow or shadows outside those inner bounds.\nAt4:3 canvas1448x1086, the eight cell centers are approximately(181,271),(543,271),(905,271),(1267,271),(181,815),(543,815),(905,815),(1267,815). These describe placement only and must not be printed in the image.\nOrder: row1 pine,broadleaf,shrub/rocks,lantern; row2 Council table andeightchairs,canopydesk,pond,garden.\nActual clean transparent alpha around each prop with all unused pixels fully transparent. No stray fragments, haze, speckles or faint semi-transparent debris outside the props. No checkerboard, backdrop, grass platform, labels, grid, captions, people or new subjects. Avoid reducing artistic detail; retain the gorgeous intricate original material rendering.",
+      "prompt_scope": "Selected final layout correction; the full generation and revision prompt set follows.",
+      "generation_steps": [
+        {
+          "stage": "initial generation",
+          "style_reference_assets": [
+            "home/web/houses.webp",
+            "home/web/town-terrain.webp"
+          ],
+          "prompt": "Use case: stylized-concept\nAsset type: one production sprite atlas for a modular browser RPG village.\nInput images: Image 1 (houses.webp) and Image 2 (town-terrain.webp) are STYLE REFERENCES ONLY. Create eight NEW props that match their highly detailed painterly miniature fantasy village art, realistic wood/stone/foliage, warm amber evening lights and cool muted forest color. Do not reproduce their full scenes.\nPrimary request: one wide 4:3 transparent RGBA image, ideally 2048 by 1536 pixels. Arrange exactly EIGHT complete, separate props in an invisible precise grid of FOUR equal-width columns and TWO equal-height rows. Every prop must remain entirely inside its own cell. Leave wide completely transparent gutters and clear transparent outer borders, with no contact or overlap between cells. Center each prop horizontally in its cell and align its lowest ground contact near 85 percent of that cell's height. Empty space above smaller props must remain transparent.\nCell contents in strict reading order:\nTop row, left to right: 1 one mature blue-green conifer/pine tree; 2 one mature broadleaf tree with rounded moss-green foliage; 3 one low shrub with a small weathered rock cluster and a few white wildflowers; 4 one freestanding wooden or wrought-iron lantern post with a warm amber lamp.\nBottom row, left to right: 5 one round wooden Council table with exactly eight complete chairs around it, a small lantern and blank papers on the tabletop; 6 one compact open-sided outdoor writing workshop with a weathered sage fabric canopy over a wooden writing desk, blank papers, a small warm lamp and stool, no enclosed building; 7 one small irregular clear blue-green pond framed by a few rocks and reeds; 8 one small raised timber flower and herb garden bed.\nView: all props share the SAME camera as the reference houses, a 45-degree elevated three-quarter view. Game-ready layered cutouts with natural material detail, coherent scale within each prop, soft subtle ground contact shadows contained inside each cell, lovely hand-painted storybook RPG finish, restrained dusk color, crisp silhouettes, no thick black outlines, no vector/cartoon simplification.\nConstraints: genuine transparent background, not a drawn checkerboard. No grass islands or floor tiles under the props except the pond's own water/rock edge and garden bed. No connecting terrain, paths, fences, houses, people, characters, labels, captions, text, logos, borders, grid lines, frames or watermarks. No cropped branches, lamps, chair legs or shadows. Absolutely no environmental scene spanning multiple cells. Render all eight complete props with equally careful detail.",
+          "selected": false
+        },
+        {
+          "stage": "first spacing correction",
+          "edit_target": "Output of the preceding generation step.",
+          "prompt": "Use case: precise-object-edit\nEdit target: the supplied transparent eight-prop atlas.\nChange ONLY the layout and size of the existing eight props. Preserve their detailed painterly dusk RPG style, colors, materials, subjects and transparent alpha. The current props are too large for equal cells. Recompose them into a strict invisible grid of FOUR EQUAL COLUMNS and TWO EQUAL ROWS with wide entirely transparent gutters.\nExact composition: each prop's horizontal center must be at12.5%,37.5%,62.5%,87.5%of total image width respectively. Every prop must be SMALL ENOUGH that its complete opaque bounding box, branches/chairs/rocks/shadows included, is NO MORE THAN18%of total image width. That is at most72%of one column, leaving14%of the cell empty on each side. Do not enlarge wide props. Clear transparent empty gutters are essential for CSS sprite slicing.\nTop-row ground baselines at42.5%of total image height. Bottom-row ground baselines at92.5%of total image height. No visible or semi-transparent part may touch a column boundary at25%,50%,75%of image width or the row boundary at50%of image height. The broadleaf foliage, all eight Council chairs, workshop posts and pond rocks must fit wholly within their own cells. Keep at least3%of total image width transparent around each outer image edge. Keep each prop under38%of total image height so the two rows stay clearly separate.\nReading order stays unchanged: top row pine,broadleaf,shrub/rocks,lantern. Bottom row round Council table with eight chairs, canopy writing workshop,pond,garden bed.\nUse a wide4:3 canvas, preserve actual transparent background, no drawn grid, borders, labels, text, people, extra props, additional scenery or checkerboard. Do not change the eight prop designs; reduce and position them with generous empty space.",
+          "selected": false
+        },
+        {
+          "stage": "final layout correction",
+          "edit_target": "Output of the preceding spacing correction.",
+          "prompt": "Recompose the supplied eight fantasy RPG cutout props as a professionally padded sprite atlas. Keep all eight designs and their original detailed painterly appearance. Change placement and scale only.\nIMPORTANT CORRECTION: the first row is too low and objects are too large. MOVE EVERY TOP-ROW PROP UPWARD BY ABOUT150PIXELS. REDUCE EVERY PROP TO ABOUT60PERCENT OF ITS CURRENT WIDTH AND HEIGHT. This intentionally creates very generous transparent empty space. The sprite art should occupy a small central portion of each cell, never approach an edge. Leave enormous empty transparent gutters, especially across the entire horizontal middle of the canvas. Do not fill the empty space.\nUse FOUR equal columns and TWO equal rows. Imagine each cell as a transparent box. CENTER THE COMPLETE PROP'S BOUNDING BOX BOTH HORIZONTALLY AND VERTICALLY WITHIN ITS OWN BOX. Do NOT align tops, bottoms or ground baselines between differently sized props in this revision; center each complete silhouette in its own cell. Each prop must fit inside the central60PERCENT of its cell width and central70PERCENT of its cell height. No leaves, chair legs, rocks, glow or shadows outside those inner bounds.\nAt4:3 canvas1448x1086, the eight cell centers are approximately(181,271),(543,271),(905,271),(1267,271),(181,815),(543,815),(905,815),(1267,815). These describe placement only and must not be printed in the image.\nOrder: row1 pine,broadleaf,shrub/rocks,lantern; row2 Council table andeightchairs,canopydesk,pond,garden.\nActual clean transparent alpha around each prop with all unused pixels fully transparent. No stray fragments, haze, speckles or faint semi-transparent debris outside the props. No checkerboard, backdrop, grass platform, labels, grid, captions, people or new subjects. Avoid reducing artistic detail; retain the gorgeous intricate original material rendering.",
+          "selected": true
+        }
+      ],
+      "dimensions": {
+        "width": 1448,
+        "height": 1086
+      },
+      "bytes": 549054,
+      "sha256": "5db01f5d76f1c8d00c59285ec9faf3017afd80d28bd5244b9e695b22e95ba84e",
+      "conversion": "Format-only lossless WebP, quality100, method6, exactRGBA; no resizing, cropping, retouching or alpha thresholding. Reloaded RGBA pixels are identical to the selected PNG.",
+      "source_png_sha256": "8b557a4d1333755a5a5d81bf034a8508d4a7607bf5397eb053330f4d44b1c1aa",
+      "source_png_bytes": 757019,
+      "grid": {
+        "columns": 4,
+        "rows": 2,
+        "cell_width": 362,
+        "cell_height": 543
+      },
+      "alpha": {
+        "present": true,
+        "min": 0,
+        "max": 255,
+        "cell_border_band_width": 20,
+        "cell_border_band_alpha_maxima": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      "cell_bounds": [
+        {
+          "prop": "pine",
+          "column": 0,
+          "row": 0,
+          "alpha_greater_than8_bounds": [
+            113,
+            157,
+            272,
+            399
+          ],
+          "alpha_greater_than128_bounds": [
+            114,
+            159,
+            270,
+            398
+          ]
+        },
+        {
+          "prop": "broadleaf",
+          "column": 1,
+          "row": 0,
+          "alpha_greater_than8_bounds": [
+            110,
+            165,
+            299,
+            398
+          ],
+          "alpha_greater_than128_bounds": [
+            112,
+            166,
+            298,
+            397
+          ]
+        },
+        {
+          "prop": "shrub",
+          "column": 2,
+          "row": 0,
+          "alpha_greater_than8_bounds": [
+            97,
+            244,
+            289,
+            386
+          ],
+          "alpha_greater_than128_bounds": [
+            98,
+            244,
+            287,
+            385
+          ]
+        },
+        {
+          "prop": "lantern",
+          "column": 3,
+          "row": 0,
+          "alpha_greater_than8_bounds": [
+            141,
+            179,
+            258,
+            399
+          ],
+          "alpha_greater_than128_bounds": [
+            143,
+            180,
+            253,
+            397
+          ]
+        },
+        {
+          "prop": "council",
+          "column": 0,
+          "row": 1,
+          "alpha_greater_than8_bounds": [
+            78,
+            216,
+            323,
+            410
+          ],
+          "alpha_greater_than128_bounds": [
+            78,
+            217,
+            322,
+            409
+          ]
+        },
+        {
+          "prop": "studio",
+          "column": 1,
+          "row": 1,
+          "alpha_greater_than8_bounds": [
+            112,
+            173,
+            320,
+            405
+          ],
+          "alpha_greater_than128_bounds": [
+            113,
+            174,
+            319,
+            404
+          ]
+        },
+        {
+          "prop": "pond",
+          "column": 2,
+          "row": 1,
+          "alpha_greater_than8_bounds": [
+            66,
+            197,
+            320,
+            409
+          ],
+          "alpha_greater_than128_bounds": [
+            67,
+            198,
+            320,
+            408
+          ]
+        },
+        {
+          "prop": "garden",
+          "column": 3,
+          "row": 1,
+          "alpha_greater_than8_bounds": [
+            85,
+            199,
+            296,
+            401
+          ],
+          "alpha_greater_than128_bounds": [
+            86,
+            200,
+            295,
+            400
+          ]
+        }
+      ],
+      "bounds_convention": "Coordinates are local to equal cells; right and bottom are exclusive. Alpha bounds were measured without modifying the image.",
+      "metadata": {
+        "riff_chunks": [
+          "VP8L"
+        ],
+        "exif": false,
+        "xmp": false,
+        "icc": false
+      },
+      "usage": "Reusable generated props over procedural SVG terrain and paths. Earlier town background images remain packaged but are not rendered by the live map.",
+      "limitations": [
+        "Generated output dimensions differ from the ideal size in the initial prompt.",
+        "The initial requested85percent shared baseline was not achieved; the selected revision centers props with generous margins. Placement uses measured alpha bounds.",
+        "Scattered alpha1 pixels remain in some gutters. All20pixel cell-border bands contain no alpha greater than1. These pixels were retained unchanged.",
+        "Props and characters are static art. Movement does not establish live provider activity."
+      ]
     }
   ],
-  "notes": "Original generated project illustrations. Resident and house atlases contain five static variants each, not directional animation. No private history, source machine paths, session identifiers or provider identity included. Packaging records do not establish owner acceptance or functional provider execution."
+  "notes": "Original generated project illustrations. Resident and house atlases contain five static variants each; the terrain prop atlas contains eight static props. The live map combines reusable art with procedural terrain and paths. No private history, source machine paths, session identifiers or provider identity is included. Packaging records do not establish owner acceptance or functional provider execution."
 }

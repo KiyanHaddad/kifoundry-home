@@ -28,6 +28,9 @@ The runtime uses Python 3.11+, SQLite and browser ES modules. It requires no fro
 | [`home/adapters/`](../home/adapters/) | Native command construction, response parsing, limits and owned processes. |
 | [`home/server.py`](../home/server.py), [`home/cli.py`](../home/cli.py) | Local transport, authentication and application startup. Domain behavior stays in Store and Council. |
 | [`home/web/`](../home/web/) | Town navigation, directory, conversation, Council selection and draft editor. |
+| [`home/web/world-layout.js`](../home/web/world-layout.js) | Pure slot-to-world geometry, neighborhood counts, landmarks and world bounds. |
+| [`home/web/world-camera.js`](../home/web/world-camera.js) | World position, zoom, viewport bounds and native scroll conversion. |
+| [`home/web/world-terrain.js`](../home/web/world-terrain.js), [`home/web/world.js`](../home/web/world.js) | Modular scenery and keyed homes/actors, navigation and decorative movement. |
 
 Keep SQL in Store. The browser sends the documented HTTP actions; it does not construct provider commands or access arbitrary files.
 
@@ -258,8 +261,12 @@ Browser room `artifacts` are flat version metadata, newest 100 first; `next_arti
 ## 7. Frontend integration rules
 
 - Render user/model content as text. Do not execute it as HTML, code or a provider command.
-- Use saved slots for layout. `world-layout.js` groups homes into neighborhoods of five plots, and appearance stays stable by resident ID.
-- Rendering at most five selected guests does not cap Council participation. Report additional participants and use the server's advertised execution limits for budgets.
+- Use saved slots for layout. `world-layout.js` maps each `home_slot` to an absolute world position in a neighborhood of eight plots. Neighborhood centers follow a fixed square spiral, starting with the commons, north, northeast and east. Appearance stays stable by resident ID. Existing saved slots require no migration.
+- `layoutTown(agents, extraDistricts)` returns active entries, occupied/retained neighborhoods, their counts, central landmarks and padded bounds. Retain connecting neighborhoods and neighborhoods referenced by archives or the current page so moving the last resident out does not erase the scenery or shrink the viewport. Vacant plots show gardens; archived identities do not render as active homes or actors.
+- Adding, archiving or restoring a resident never repositions another active home. Restoring prefers the previous slot only while free; otherwise the server assigns the first free active slot. Preserve identities, sessions and saved attribution independently of presentation.
+- Keep camera state in world coordinates. Registry changes preserve the current place and zoom within reachable bounds. Overview fits the map; the neighborhood selector and resident focus provide direct navigation. Keyboard focus on an offscreen home or actor must reveal it, with native touch scrolling and reduced motion preserved.
+- The current registry supports at most 64 active residents, spread across eight neighborhoods. Render active identities independently of decorative animation capacity: at most eight movements animate together, while other actors are placed at their destination. No visual limit changes actual Council participation or its advertised provider-call budget.
+- The existing five house and character appearances are fixed art variants. Movement and a stride effect do not establish directional sprite animation, autonomous activity or provider success. At distant zoom, neighborhood markers provide names, counts and navigation; houses remain visible as scenery while individual labels and actors are hidden.
 - Reopen the browser's remembered room when available. If creating a room succeeds but its readback fails, retry opening that confirmed room rather than creating another.
 - `recoveryInfo(round)` derives safe eligibility, uncertain launched-call count and a conservative remaining-call bound from saved states. The recovery selector uses saved participant snapshots and preserves the current draft.
 - Post `{}` for resume. Adopt a confirmed resume response before optional readback, so a failed readback does not prompt duplicate dispatch.

@@ -4,7 +4,7 @@
 
 Open the resident directory and choose **Add resident**. Give them a name and role, then select an existing provider connection. The town supports up to 64 active residents. Use **Talk** for a direct conversation, **Invite to Council** for individual guests, or **Invite all** for the available town. The composer shows the `2N+1` call budget before Send. A specialist backed by Claude remains labelled Claude; fixture residents remain explicitly marked as simulated.
 
-Use **Move out** to archive a resident while keeping their conversations and saved sessions. **Bring back** restores the same ID, preferring the previous home slot if free. Other active homes stay where they are. Changes wait for all current conversations and owned calls to finish.
+Use **Move out** to archive a resident while keeping their conversations and saved sessions. Their released plot becomes a garden until another resident occupies it; the neighborhood remains connected. **Bring back** restores the same ID, preferring the previous home slot if free and otherwise using the first free slot. Other active homes stay where they are. Changes wait for all current conversations and owned calls to finish.
 
 ## Configure a provider connection
 
@@ -14,7 +14,13 @@ Keep roles short and concrete. Executable paths, workspace, timeout and provider
 
 ## Change the town layout
 
-Use saved `home_slot` values as the location authority. `home/web/world-layout.js` maps them into five-home neighborhoods; `world.js` renders homes, avatars and saved execution state. Preserve ID-based avatar appearance and existing slots when filtering or changing the population. Keep the visible Council cast bounded while preserving every selected guest in actual dispatch and the directory. Check 7- and 64-resident cases, slot reuse and archived residents. Asset variants and transparency are documented in ASSETS.md.
+Use saved `home_slot` values as the location authority. [`world-layout.js`](../home/web/world-layout.js) maps them into absolute coordinates in eight-home neighborhoods. Fixed neighborhood centers expand along a square spiral; adding a resident does not redistribute other homes. `layoutTown(agents, extraDistricts)` also retains empty neighborhoods, including those referenced by archives. The current registry remains bounded at 64 active residents.
+
+Keep geometry, camera and scenery separate. [`world-camera.js`](../home/web/world-camera.js) handles pan, zoom and native scrolling; [`world-terrain.js`](../home/web/world-terrain.js) draws reusable scenery; [`world.js`](../home/web/world.js) reconciles keyed homes and actors with the registry and saved execution state. A layout revision changes presentation without rewriting stored slots or histories. Resident refreshes should preserve the current camera position. Provide explicit neighborhood navigation, Overview and keyboard access instead of shrinking every label with the map.
+
+Preserve ID-based appearance when filtering or changing the population. All active residents can be placed in the world; at most eight decorative movements animate together. This limit must not affect Council selection or dispatch. The five existing house and character appearances are fixed variants; the stride effect does not provide separate facing-direction frames. Asset variants and transparency are documented in [Assets](../ASSETS.md).
+
+Check populations of 0, 1, 5, 16 and 64, plus a sparse town containing only slot 63. Verify slot reuse, archive/conditional restore, retained empty neighborhoods, unchanged other homes, camera continuity, keyboard focus and phone overview readability. Fixture population tests do not establish real-provider scale.
 
 Changing registry fields requires a numbered Store migration, updated HTTP/consumer contracts and migration tests. Preserve participant snapshots and saved speaker attribution. Do not rewrite historical replies from the current roster.
 

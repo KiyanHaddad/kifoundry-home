@@ -21,13 +21,15 @@
 </div>
 <div class="desk-activity"><span id="deskActivityDot" class="desk-activity-dot" aria-hidden="true"></span><div class="desk-activity-copy"><p class="desk-label">Activity in this conversation</p><p id="deskActivity" class="desk-activity-title" role="status" aria-live="polite">Loading saved progress…</p><p id="deskActivityDetail" class="desk-note"></p></div><button id="deskActivityButton" class="desk-details" type="button" disabled>View replies <span aria-hidden="true">↗</span></button></div>
 </section>
-<nav id="districts" class="districts hidden" aria-label="Town neighborhoods"></nav>
-<div id="town" class="town" aria-label="Your town">
-<img class="town-art" src="/town-terrain.webp" width="1536" height="1024" alt="A lantern-lit forest clearing with paths between resident homes, a central Council table and a shared studio.">
-<div class="scene-hud"><span><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10Z"/></svg>Evening at the commons</span></div>
+<nav id="districts" class="town-navigation" aria-label="Town neighborhoods"><label for="neighborhoodSelect">Visit<select id="neighborhoodSelect"><option value="">Choose a neighborhood</option></select></label><span id="mapHint">Drag or swipe to explore · arrow keys move the map</span></nav>
+<div id="town" class="town town-map" aria-label="Your town">
+<div class="map-toolbar"><div class="map-destinations"><button id="commonsViewButton" type="button">Commons</button><button id="fitTownButton" type="button">Overview</button></div><div class="map-zoom" aria-label="Map zoom"><button id="zoomOutButton" type="button" aria-label="Zoom out">−</button><output id="zoomLevel" aria-label="Zoom level">72%</output><button id="zoomInButton" type="button" aria-label="Zoom in">+</button></div></div>
+<div id="mapViewport" class="map-viewport" tabindex="0" role="group" aria-label="Town map. Arrow keys pan, plus and minus zoom, Home visits the commons, End shows the town."><div id="mapExtent" class="map-extent"><div id="mapSurface" class="map-surface">
 <div id="houses" class="houses" aria-label="Resident homes"></div><div id="residents" class="residents" aria-label="Residents in the village"></div>
+<div id="mapMarkers" class="map-markers" aria-label="Neighborhood overview"></div>
 <button id="commonsButton" class="landmark commons" type="button"><span class="landmark-label"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 13h16M7 13v7m10-7v7M8 7a4 4 0 0 1 8 0M4 7v3m16-3v3"/></svg><span>The commons<small>Gather Council</small></span></span></button>
 <button id="studioButton" class="landmark studio" type="button"><span class="landmark-label"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 17 1-4L16 2l5 5L10 18l-6 1Zm9-12 5 5M4 22h16"/></svg><span>The studio<small>Bring your work</small></span></span></button>
+</div></div></div>
 <div class="world-footer"><span id="worldStatus">Choose a home to start talking.</span><button id="motionButton" class="motion-button" type="button" aria-pressed="false">Pause wandering</button><span class="motion-legend">Walking is decorative</span></div>
 </div>
 <div class="continuity"><div class="continuity-heading"><h2>Your conversations</h2><button id="newRoomButton" class="text-button" type="button"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New conversation</button></div><nav id="rooms" class="room-list" aria-label="Saved conversations"></nav></div>
