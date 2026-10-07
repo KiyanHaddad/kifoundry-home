@@ -28,6 +28,7 @@ jobs:
       - run: node --check home/web/world-layout.js
       - run: node --check home/web/resident-directory.js
       - run: node --check home/web/room.js
+      - run: node --check home/web/working-desk.js
       - run: python scripts/check_public_tree.py
       - run: python scripts/check_public_tree.py --tracked
       - run: python scripts/check_public_tree.py --history

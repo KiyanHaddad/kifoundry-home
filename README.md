@@ -26,7 +26,7 @@ For Python installation, a virtual environment, or troubleshooting, follow the [
 | Discuss an idea together | Choose guests, then **Ask the Council** |
 | Improve a script or draft | **Bring work**, save it, then send your request |
 | Keep a useful reply | **Use as draft**, review it, then save a revision |
-| Continue later | Restart with the same data directory and open the saved conversation |
+| Continue later | Restart with the same data directory; **Your working desk** shows the current conversation, saved draft and reply status |
 
 Council uses independent proposals, one round of challenges, and an attributed synthesis. It preserves replies and disagreements. A group of `N` residents can use up to `2N+1` provider calls; the interface shows the bound before Send.
 

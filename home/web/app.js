@@ -1,5 +1,6 @@
 import { TownWorld } from './world.js';
 import { normalizeRoom, recoveryInfo } from './room.js';
+import { newestPageDraft, deskActivity } from './working-desk.js';
 import { ResidentDirectory } from './resident-directory.js';
 import { readSessionProof, saveSessionProof, requestJSON } from './http.js';
 /** @typedef {{id:string,name:string,provider:string,role?:string}} Agent */
@@ -14,6 +15,7 @@ const state = {
   poll: 0, registryEpoch: 0, editKey: "", attachedId: "", editDirty: false, discussionKey: "", activityKey: "", activityRoundId: "",
   roomCursor: null, loadingRooms: false, artifactCursor: null, artifactPages: 0, loadingArtifacts: false,
   artifactBodies: new Map(), artifactRequests: new Map(), artifactLoadEpoch: 0, loadingArtifact: false, unresolvedArtifact: false,
+  recentArtifact: null,
 };
 const activeStatuses = new Set(["queued", "running"]);
 const statusLabels = { queued: "Waiting their turn", running: "Thinking", completed: "Finished", failed: "Could not reply", cancelled: "Stopped", interrupted: "Interrupted", partial: "Some replies received" };
@@ -57,6 +59,7 @@ async function api(path, body, headers = {}) {
 }
 
 async function boot() {
+  if (state.loading || state.saving || state.sending || state.resuming) return;
   state.loading = true;
   updateComposer();
   showError("bootErrorText"); toggle("bootError", false);
@@ -79,13 +82,16 @@ async function boot() {
     $("modeLabel").classList.toggle("fixture", state.fixture);
     $("conversationFootnote").textContent = state.fixture ? "This is a fixture demo. These simulated replies do not verify live providers." : "Each resident speaks for themselves. You decide what happens next.";
     renderHouses(); renderParticipants();
-    const lastRoom = storageRead("kifoundry-home:last-room");
+    // A reconnect keeps the open conversation and in-memory edits even when
+    // browser storage is blocked or full. Initial loading still restores storage.
+    const lastRoom = state.room?.id || storageRead("kifoundry-home:last-room");
     let room = data.room;
     if (lastRoom && lastRoom !== room.id) {
       try { room = await api("/api/rooms/" + encodeURIComponent(lastRoom)); }
       catch (error) { if (error.status !== 404) throw error; }
     }
-    adoptRoom(room, true);
+    adoptRoom(room, room.id !== state.room?.id);
+    showError('composerError');
   } catch (error) {
     state.connected = false; updateHouseStates();
     $("modeLabel").textContent = "Home connection unavailable";
@@ -220,8 +226,10 @@ function restoreDraft() {
   $("artifactTitle").value = typeof draft?.title === "string" ? draft.title : "";
   $("artifactContent").value = typeof draft?.content === "string" ? draft.content : "";
 }
-function adoptRoom(room, changed = false) {
+function adoptRoom(room, changed = false, fresh = true) {
   room = normalizeRoom(room);
+  // Capture the server's insertion order before merging deliberately loaded older pages.
+  if (fresh) state.recentArtifact = newestPageDraft(room.artifacts);
   if (!changed && state.room?.id === room.id) {
     const versions = new Map(state.room.artifacts.map(artifact => [artifactKey(artifact), artifact]));
     for (const artifact of room.artifacts) versions.set(artifactKey(artifact), artifact);
@@ -393,6 +401,58 @@ function updateComposer() {
   const artifact = latestArtifact(state.attachedId);
   $("attachedWork").textContent = artifact ? artifact.title + " · v" + artifact.version : "";
   renderRecovery();
+  renderWorkingDesk();
+}
+function deskText(id, text) {
+  if ($(id).textContent !== text) $(id).textContent = text;
+}
+function renderWorkingDesk() {
+  const room = state.room, recent = state.recentArtifact;
+  const unsent = Boolean($('composerText').value.trim());
+  deskText('deskConversation', room?.title || 'Opening your home…');
+  deskText('deskConversationNote', !room ? 'Loading saved work.' : unsent ? 'Unsent message on this browser.' : 'Your discussion is saved on this device.');
+  deskText('deskDraftLabel', state.editDirty ? 'Draft in progress' : 'Most recently saved draft');
+  deskText('deskDraft', state.editDirty ? $('artifactTitle').value.trim() || 'Untitled draft' : recent?.title || 'No saved draft yet');
+  deskText('deskDraftNote', state.editDirty ? 'Unsaved edits on this browser.' : recent ? 'Version ' + recent.version + ' · saved on this device' : 'Bring a script, a plan, or an idea.');
+  toggle('deskSavedRevision', Boolean(state.editDirty && recent));
+  deskText('deskSavedRevision', recent ? 'Latest saved: ' + recent.title + ' · v' + recent.version : '');
+  deskText('deskDraftButton', state.loadingArtifact ? 'Loading draft…' : state.editDirty || state.unresolvedArtifact ? 'Continue editing ↗' : recent ? 'Open saved draft ↗' : 'Bring a draft ↗');
+  $('continueConversationButton').disabled = !room || state.loading;
+  $('deskDraftButton').disabled = !room || state.loading || state.saving || state.loadingArtifact;
+  const activity = deskActivity(room, state.connected, state.fixture);
+  deskText('deskActivity', activity.text); deskText('deskActivityDetail', activity.detail);
+  $('deskActivityDot').dataset.tone = activity.tone;
+  deskText('deskActivityButton', state.loading ? 'Connecting…' : state.connected ? 'View replies ↗' : 'Reconnect ↗');
+  $('deskActivityButton').disabled = state.loading || (state.connected ? !activity.hasRound : state.saving || state.sending || state.resuming);
+  deskText('savedLabel', state.editDirty || unsent ? 'Unsaved draft' : state.connected ? 'Saved locally' : 'Saved progress');
+}
+function continueConversation() {
+  if (!state.room || state.loading) return;
+  $('composerText').focus({preventScroll:true});
+  $('composer').scrollIntoView({behavior:motionBehavior(), block:'center'});
+}
+async function continueDeskDraft() {
+  if (!state.room || state.loading || state.saving || state.loadingArtifact) return;
+  const roomId = state.room.id;
+  // Opening the desk must never replace the user's unsaved or unresolved editor.
+  openStudio();
+  if (state.editDirty || state.unresolvedArtifact || !state.recentArtifact) return;
+  await selectArtifact(artifactKey(state.recentArtifact));
+  if (state.room?.id === roomId && !$('studioPanel').classList.contains('hidden') && document.activeElement === document.body) {
+    $('artifactTitle').focus({preventScroll:true});
+  }
+}
+function viewDeskActivity() {
+  if (!state.room || state.loading) return;
+  const round = pendingRound() || state.room.rounds.at(-1);
+  if (!round) return;
+  state.activityRoundId = round.id; renderActivity();
+  const details = $('roundActivity').querySelector('details');
+  if (details) {
+    details.open = true;
+    details.querySelector('summary').focus({preventScroll:true});
+    $('roundActivity').scrollIntoView({behavior:motionBehavior(), block:'center'});
+  }
 }
 async function sendMessage(event) {
   event.preventDefault(); if (!state.room || state.sending || state.resuming || pendingRound()) return;
@@ -435,7 +495,7 @@ async function resumeRound() {
     const resumed = await api('/api/rounds/' + encodeURIComponent(roundId) + '/resume', {});
     submitted = true;
     if (epoch === state.epoch && state.room.id === roomId) {
-      adoptRoom({...state.room, rounds: state.room.rounds.map(round => round.id === roundId ? resumed : round)});
+      adoptRoom({...state.room, rounds: state.room.rounds.map(round => round.id === roundId ? resumed : round)}, false, false);
       $('composerText').focus({preventScroll:true});
       const room = await api('/api/rooms/' + encodeURIComponent(roomId));
       if (epoch === state.epoch && state.room.id === roomId) adoptRoom(room);
@@ -449,7 +509,7 @@ async function refreshRoom() {
   if (!state.room) return;
   const roomId = state.room.id, epoch = state.epoch;
   try { const room = await api("/api/rooms/" + encodeURIComponent(roomId)); if (epoch === state.epoch && state.room.id === roomId) adoptRoom(room); }
-  catch (error) { if (epoch === state.epoch) { state.connected=false; updateHouseStates(); showError("composerError", error.message); } }
+  catch (error) { if (epoch === state.epoch) { state.connected=false; updateHouseStates(); updateComposer(); showError("composerError", error.message); } }
 }
 function schedulePoll() {
   window.clearTimeout(state.poll);
@@ -600,7 +660,7 @@ function useMessageAsDraft(content) {
   openStudio(); $("artifactContent").value = content;
   if (!$("artifactTitle").value) $("artifactTitle").value = "Conversation draft";
   state.editDirty = true; $("artifactNotice").textContent = "Reply placed on the desk. Review it, then save a draft or revision.";
-  persistDraft(); $("artifactContent").focus({ preventScroll: true });
+  persistDraft(); renderWorkingDesk(); $("artifactContent").focus({ preventScroll: true });
 }
 async function renderComparison() {
   const selected = selectedArtifact();
@@ -646,6 +706,7 @@ async function saveArtifact(event) {
     const {content: savedContent, ...metadata} = artifact;
     const versions = state.room.artifacts.filter(item => artifactKey(item) !== artifactKey(artifact));
     state.room.artifacts = [...versions.map(item => item.id === artifact.id ? {...item, latest_version: artifact.version} : item), {...metadata, latest_version: artifact.version}];
+    state.recentArtifact = {...metadata, latest_version: artifact.version};
     state.editKey = artifactKey(artifact); state.editDirty = false; state.attachedId = artifact.id;
     renderArtifacts(); persistDraft();
     $("artifactNotice").textContent = "Version " + artifact.version + " saved. It will be included in your next message.";
@@ -676,9 +737,12 @@ $("everyoneButton").addEventListener("click", openDirectory);
 $("residentsButton").addEventListener("click", openDirectory);
 $("studioButton").addEventListener("click", openStudio);
 $("bringWorkButton").addEventListener("click", openStudio);
+$("continueConversationButton").addEventListener("click", continueConversation);
+$("deskDraftButton").addEventListener("click", continueDeskDraft);
+$("deskActivityButton").addEventListener("click", () => state.connected ? viewDeskActivity() : boot());
 $("closeStudioButton").addEventListener("click", () => { toggle("studioPanel", false); state.studioReturn?.focus({preventScroll:true}); });
 $("composer").addEventListener("submit", sendMessage);
-$("composerText").addEventListener("input", persistDraft);
+$("composerText").addEventListener("input", () => { persistDraft(); renderWorkingDesk(); });
 $("composerText").addEventListener("keydown", (event) => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !$("sendButton").disabled) { event.preventDefault(); $("composer").requestSubmit(); } });
 $("cancelButton").addEventListener("click", cancelRound);
 $('resumeButton').addEventListener('click', resumeRound);
@@ -690,7 +754,7 @@ $('retryArtifactButton').addEventListener('click', restoreSelectedVersion);
 $("newDraftButton").addEventListener("click", () => selectArtifact(""));
 $("recoverDraftButton").addEventListener("click", recoverEditedWork);
 $("artifactForm").addEventListener("submit", saveArtifact);
-for (const id of ["artifactTitle", "artifactContent"]) $(id).addEventListener("input", () => { state.editDirty = true; persistDraft(); });
+for (const id of ["artifactTitle", "artifactContent"]) $(id).addEventListener("input", () => { state.editDirty = true; persistDraft(); renderWorkingDesk(); });
 $("attachArtifact").addEventListener("change", () => { state.attachedId = $("attachArtifact").checked ? selectedArtifact()?.id || "" : ""; persistDraft(); updateComposer(); });
 $("compareSelect").addEventListener("change", renderComparison);
 $("newRoomButton").addEventListener("click", () => { state.newRoomPending=null; $("newRoomTitle").value = ""; showError("newRoomError"); $("newRoomDialog").showModal(); });

@@ -2,6 +2,14 @@
 
 This is a local development alpha. These checks establish specific behavior. User acceptance, repository publication and remote CI have separate evidence.
 
+## Working desk follow-up: version 0.1.2
+
+An isolated browser fixture check covered exact saved-revision opening, saving a new revision, reloading with an unsent message and unsaved editor text, keyboard continuation, execution-detail navigation, and switching to a new conversation. Simulated connection loss and reconnection preserved both drafts and the open conversation. No native providers were invoked.
+
+Desktop and 390-pixel phone views were inspected. The phone view had no horizontal overflow and the new desk actions had 44-pixel touch targets. The updated README image is an actual capture using only demonstration data. Controlled regressions cover metadata order, stale versions, saved execution states, dirty-editor preservation and asynchronous navigation. This establishes the implemented current-conversation desk; it does not establish a global task manager or owner usability acceptance.
+
+The source suite discovered 182 tests and completed with one POSIX-only check skipped on Windows. Ruff, mypy, compilation and all seven browser-module syntax checks passed. Source and wheel builds passed; all 30 runtime files in the wheel matched the source, including the new desk module. The outgoing text and demonstration screenshot received a renewed privacy review.
+
 ## Security and growth follow-up: version 0.1.1
 
 An independent review covered the then-public 71 files, 90 unique historical blobs across three commits, all five images and all three public CI logs. No sensitive data was found in that bounded review. The repaired scanner additionally checks reachable commit trees/metadata, literal credential assignments, shallow-history rejection, unreadable-directory failures and finite inspection limits; its suite now contains 16 tests.

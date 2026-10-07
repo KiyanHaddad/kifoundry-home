@@ -13,6 +13,14 @@
 <main class="home-shell">
 <section class="world-panel" aria-labelledby="worldTitle">
 <div class="world-heading"><div><h1 id="worldTitle">A place to think together.</h1><p>Choose a home to talk. Meet at the commons to think together.</p></div><div class="world-actions"><span id="residentCount" class="resident-count"></span><button id="residentsButton" class="small-button" type="button">Residents</button></div></div>
+<section id="workingDesk" class="working-desk" aria-labelledby="deskTitle">
+<div class="desk-heading"><h2 id="deskTitle">Your working desk</h2><span>Pick up where you left off</span></div>
+<div class="desk-columns">
+<div class="desk-item"><p class="desk-label">Current conversation</p><h3 id="deskConversation">Opening your home…</h3><p id="deskConversationNote" class="desk-note">Loading saved work.</p><button id="continueConversationButton" class="desk-continue" type="button" disabled>Continue conversation <span aria-hidden="true">↗</span></button></div>
+<div class="desk-item"><p id="deskDraftLabel" class="desk-label">Most recently saved draft</p><h3 id="deskDraft">No saved draft yet</h3><p id="deskDraftNote" class="desk-note">Bring a script, a plan, or an idea.</p><p id="deskSavedRevision" class="desk-saved hidden"></p><button id="deskDraftButton" class="desk-open" type="button" disabled>Bring a draft <span aria-hidden="true">↗</span></button></div>
+</div>
+<div class="desk-activity"><span id="deskActivityDot" class="desk-activity-dot" aria-hidden="true"></span><div class="desk-activity-copy"><p class="desk-label">Activity in this conversation</p><p id="deskActivity" class="desk-activity-title" role="status" aria-live="polite">Loading saved progress…</p><p id="deskActivityDetail" class="desk-note"></p></div><button id="deskActivityButton" class="desk-details" type="button" disabled>View replies <span aria-hidden="true">↗</span></button></div>
+</section>
 <nav id="districts" class="districts hidden" aria-label="Town neighborhoods"></nav>
 <div id="town" class="town" aria-label="Your town">
 <img class="town-art" src="/town-terrain.webp" width="1536" height="1024" alt="A lantern-lit forest clearing with paths between resident homes, a central Council table and a shared studio.">

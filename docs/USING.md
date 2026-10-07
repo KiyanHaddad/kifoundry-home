@@ -2,6 +2,16 @@
 
 The town gives you three entrances: a resident's house for a conversation, the commons for Council, and the studio for written work. **Residents** also provides a searchable list when the town grows.
 
+## Pick up your work
+
+**Your working desk**, above the town, shows the current conversation, most recently saved draft and activity in that conversation.
+
+- **Continue conversation** takes you to the message box. An unsent message stays on this browser until you send or clear it.
+- **Open saved draft** opens the exact most recently saved revision. If you have unsaved edits, **Continue editing** reopens those edits instead. The desk labels unsaved text separately from saved work.
+- **View replies** opens saved execution details. **Reconnect** retries loading Home after a connection failure.
+
+These actions do not send a message, resume a round or attach a draft. Activity reflects the conversation's last loaded execution state; walking remains decorative. Demo replies stay labelled as simulated.
+
 ## Talk to one resident
 
 1. Choose their house, or open **Residents → Talk**.

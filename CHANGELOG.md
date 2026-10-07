@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 — 2026-10-06
+
+- Add a working desk above the town: current conversation, most recently saved draft and actual execution status, with direct actions to continue.
+- Distinguish unsent messages and unsaved edits from saved revisions. Reopening the desk preserves the current editor; opening saved work loads its exact version.
+- Keep the most recent draft stable when older history is loaded or a stopped round is resumed. Add keyboard focus restoration and a connection retry action.
+- Add controlled regressions for continuity, metadata ordering, execution states and navigation without provider submission.
+
 ## 0.1.1 — 2026-10-06
 
 - Include the documentation, examples and publication scanner in source distributions.

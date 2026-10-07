@@ -2,9 +2,9 @@
 
 ## Documentation screenshot
 
-`docs/images/town-demo.jpg` is an unedited browser capture of this application on 6 October 2026. It shows a fresh offline fixture town with the default Echo and Quill residents and no user conversations. It contains no browser chrome, local paths, launch URL or native provider data. The included artwork and fonts retain the provenance and licenses below.
+`docs/images/town-demo.jpg` is an unedited browser capture of version 0.1.2 on 6 October 2026. It shows the working desk in an isolated offline fixture town with the default Echo and Quill residents, a synthetic conversation and a demonstration draft. It contains no browser chrome, local paths, launch URL, private user records or native provider data. The included artwork and fonts retain the provenance and licenses below.
 
-SHA-256: `ed36ca3b0191b949d96a2cb7285d498b44853efcfa360b51e1843664b67432d6`.
+SHA-256: `b799ed93f3d0426cfd52f94ee6f8596a5f68843e000d643ac06df95c9027f20c`.
 
 Public demonstration text in `examples/script.txt` and the interface code are original to this project. Provider CLIs are external prerequisites and are not bundled.
 

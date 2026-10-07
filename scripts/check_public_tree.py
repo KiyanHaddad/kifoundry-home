@@ -26,7 +26,10 @@ REVIEWED_ASSETS = {
     "home/web/fraunces-500.ttf": {"0c2fad18ed36cc400041f1e281ee79954a329b345caffc38dfaa3bb8bcef57de"},
     "home/web/manrope-400.ttf": {"a13d9b41b0a471ce58f0e46d377fa3cc76615e4632c3b15eb397caadf7a13f0a"},
     "home/web/manrope-600.ttf": {"6bad1a774228464cc88b8b0271555b266f7a3c64a7bedf15e165fdab4f6ac0ce"},
-    "docs/images/town-demo.jpg": {"ed36ca3b0191b949d96a2cb7285d498b44853efcfa360b51e1843664b67432d6"},
+    "docs/images/town-demo.jpg": {
+        "ed36ca3b0191b949d96a2cb7285d498b44853efcfa360b51e1843664b67432d6",
+        "b799ed93f3d0426cfd52f94ee6f8596a5f68843e000d643ac06df95c9027f20c",
+    },
 }
 PATTERNS = {
     "personal profile path": re.compile(

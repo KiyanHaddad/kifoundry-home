@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kifoundry-home"
-version = "0.1.1"
+version = "0.1.2"
 description = "A local shared AI home with real, bounded Council conversations"
 requires-python = ">=3.11"
 dependencies = []
